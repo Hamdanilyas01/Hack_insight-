@@ -83,3 +83,12 @@ node --test website/test_frontend.cjs
 ```
 
 No JavaScript dependency install or build step is required.
+
+## Exploring the updated dashboard
+
+- Overview is a full-width city summary combining weather and air outlooks. The top panel is explicitly labeled City now; its values and the central weather display remain the latest source conditions.
+- Use From / To and Apply for inclusive Karachi calendar dates. Reset returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
+- Forecast has the only temperature/heat-index line chart, with a vertical model-valid boundary, shaded future region, dashed prediction lines, event pins and a visual hourly planning strip. Recent values are model estimates, not observed sensor measurements. The separate stored ML point is never presented as a continuously rerun prediction.
+- Air quality has AQI, particle concentrations and a historical archive. Custom archive dates use daily means grouped by Karachi day; the default longer view uses the latest 12 monthly means. Animated dots are illustrative, not measurements. PM10 includes PM2.5; the values must not be added.
+- Each tab changes the KPI panel. Selecting a network node highlights its direct incoming/outgoing links. Close the detail panel to clear the highlight. Animations respect reduced-motion preferences.
+- The date selector filters available records; it does not trigger historical API backfills or change the read-only database/update schedule. Live responses include up to 12 recent model hours plus the future outlook.

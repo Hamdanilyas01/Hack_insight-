@@ -125,6 +125,29 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(env.aqi_category(50),'Good');self.assertEqual(env.aqi_category(51),'Moderate')
         self.assertEqual(env.aqi_category(151),'Unhealthy');self.assertEqual(env.aqi_category(None),'Not available')
 
+    def test_recent_model_values_and_prediction_boundary_remain_separate(self):
+        raw=source_fixture('weather')
+        start=raw['current']['time']
+        raw['hourly']['time']=[start+(i-12)*3600 for i in range(61)]
+        for key, values in raw['hourly'].items():
+            if key!='time': raw['hourly'][key]=[values[0]]*61
+        result=env.parse_feed(raw,'weather',server.heat_index)
+        self.assertEqual(len(result['recent_hourly']),12)
+        self.assertEqual(len(result['hourly']),49)
+        self.assertEqual(result['forecast_start_utc'],result['valid_at_utc'])
+        self.assertTrue(all(r['time_utc']<result['forecast_start_utc'] for r in result['recent_hourly']))
+
+    def test_daily_archive_uses_karachi_calendar_days_and_real_means(self):
+        data=server.read_dashboard(live=False)
+        rows=data['air_history']['daily']
+        self.assertGreater(len(rows),1000)
+        from zoneinfo import ZoneInfo
+        self.assertTrue(all(r['time_utc'].astimezone(ZoneInfo('Asia/Karachi')).hour==0 for r in rows))
+        import duckdb
+        with duckdb.connect(str(server.ROOT / 'warehouse/heatsafe_live.duckdb'),read_only=True) as connection:
+            expected=connection.execute("SELECT avg(pm2_5) FROM cleaned.cams_air_quality WHERE dq_status='PASS' AND time_utc>=? AND time_utc<?",[rows[1]['time_utc'],rows[1]['time_utc']+timedelta(days=1)]).fetchone()[0]
+        self.assertAlmostEqual(rows[1]['pm2_5'],expected)
+
     def test_current_weather_answer_and_pipeline_explanation(self):
         weather=env.parse_feed(source_fixture('weather'),'weather',server.heat_index)
         with patch.object(server,'read_dashboard',return_value={'weather':weather}):

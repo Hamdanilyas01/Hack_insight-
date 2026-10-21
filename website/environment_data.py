@@ -81,7 +81,7 @@ def get_json(url):
 
 
 def request_url(kind):
-    params = {'latitude':24.8607, 'longitude':67.0011, 'timezone':'GMT', 'timeformat':'unixtime', 'forecast_days':3}
+    params = {'latitude':24.8607, 'longitude':67.0011, 'timezone':'GMT', 'timeformat':'unixtime', 'forecast_days':3, 'past_hours':12}
     if kind == 'weather':
         params.update({
             'current':'temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,weather_code,is_day',
@@ -145,6 +145,7 @@ def parse_feed(payload, kind, heat_index):
     if kind == 'air' and not any(current_row[k] is not None for k in keys):
         raise ValueError('Current air-quality fields unavailable')
     now = utcnow()
+    recent_rows = [r for r in rows if r['time_utc'] < current_row['time_utc']][-12:]
     rows = [r for r in rows if r['time_utc'] >= current_row['time_utc'].replace(minute=0, second=0, microsecond=0)][:49]
     if len(rows) < 2:
         raise ValueError('Insufficient future hourly data')
@@ -155,6 +156,7 @@ def parse_feed(payload, kind, heat_index):
         'source_url':'https://open-meteo.com/en/docs' if kind == 'weather' else 'https://open-meteo.com/en/docs/air-quality-api',
         'measurement_type':'modeled', 'fetched_at_utc':now, 'valid_at_utc':current_row['time_utc'],
         'cache_hit':False, 'current':current_row, 'hourly':rows,
+        'recent_hourly':recent_rows, 'forecast_start_utc':current_row['time_utc'],
         'note':'Model-based conditions, not a reading from an on-site sensor.',
     }
     if kind == 'weather':
@@ -217,10 +219,18 @@ def read_air_history(connection):
             GROUP BY 1 ORDER BY 1 DESC LIMIT 12
         ''')
         monthly = [dict(zip([c[0] for c in cursor.description], row)) for row in cursor.fetchall()][::-1]
-        return {'hourly':hourly, 'monthly':monthly, 'source':'CAMS Global historical project data',
+        cursor = connection.execute('''
+            SELECT date_trunc('day', timezone('Asia/Karachi', time_utc)) AT TIME ZONE 'Asia/Karachi' AS time_utc,
+                   avg(pm2_5) AS pm2_5, avg(pm10) AS pm10,
+                   avg(nitrogen_dioxide) AS nitrogen_dioxide, avg(ozone) AS ozone
+            FROM cleaned.cams_air_quality WHERE dq_status = 'PASS'
+            GROUP BY 1 ORDER BY 1
+        ''')
+        daily = [dict(zip([c[0] for c in cursor.description], row)) for row in cursor.fetchall()]
+        return {'daily':daily, 'hourly':hourly, 'monthly':monthly, 'source':'CAMS Global historical project data',
                 'source_url':'https://open-meteo.com/en/docs/air-quality-api', 'pollutant_unit':'µg/m³'}
     except Exception:
-        return {'hourly':[], 'monthly':[], 'source':'Historical air data unavailable', 'pollutant_unit':'µg/m³'}
+        return {'daily':[], 'hourly':[], 'monthly':[], 'source':'Historical air data unavailable', 'pollutant_unit':'µg/m³'}
 
 
 def enrich(data, historical_air, heat_index, live=False):
