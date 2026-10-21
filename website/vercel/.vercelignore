@@ -1,0 +1,10 @@
+.git/
+.vercel/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
+*.log
+*.zip
+README.md

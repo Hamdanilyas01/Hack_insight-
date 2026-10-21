@@ -55,6 +55,11 @@ website/node_modules/
 website/*.zip
 website/*.tar.gz
 
+# Generated full-stack Vercel upload bundle and isolated validation environment
+/vercel-upload/
+/heatsafe-vercel.zip
+/.vercel-test-env/
+
 # Keep original downloaded webpage snapshots local
 rag/manual/*.html
 rag/raw/*.html
