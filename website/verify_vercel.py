@@ -106,10 +106,21 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('stale', result.json()['answer'])
 
     def test_unsupported_questions_stay_unsupported(self):
-        for question in ['What is the current AQI?', 'How many hospital admissions were there?', 'Who won the football match?']:
+        for question in ['How many hospital admissions were there?', 'Who won the football match?']:
             result = self.client.post('/api/insight', json={'question':question})
             self.assertEqual(result.status_code, 200)
             self.assertIn("I don't know", result.json()['answer'])
+
+    def test_aqi_route_uses_packaged_environmental_reader(self):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        air = {'current':{'us_aqi':93.0,'aqi_category':'Moderate','pm2_5':40.0,'pm10':54.1},
+               'status':'live','valid_at_utc':now,'fetched_at_utc':now}
+        with patch.object(server, 'read_dashboard', return_value={'air_quality':air}):
+            result = self.client.post('/api/insight',json={'question':'What is the current AQI?'})
+        self.assertEqual(result.status_code,200)
+        self.assertIn('93',result.json()['answer'])
+        self.assertIn('https://open-meteo.com/en/docs/air-quality-api',result.json()['answer'])
 
     def test_invalid_and_oversized_questions(self):
         for value in ['', None, [], 4, 'x'*1001]:

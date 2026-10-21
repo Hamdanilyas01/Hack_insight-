@@ -1,260 +1,111 @@
 'use strict';
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const NS = 'http://www.w3.org/2000/svg';
-const state = {data:null, guidance:null, api:false, view:'network', filter:null, selected:'forecast', zoom:1, pan:{x:0,y:0}, unit:'C', orbit:false, paused:matchMedia('(prefers-reduced-motion: reduce)').matches};
-const groups = {
-  weather:{color:'#a6dcc5',fill:'mint',label:'Weather signals'},
-  forecast:{color:'#d9c28d',fill:'amber',label:'Heat forecast'},
-  safety:{color:'#d8a0a5',fill:'rose',label:'Worker safety'},
-  evidence:{color:'#ae98d6',fill:'violet',label:'Verified evidence'}
-};
-const nodes = [
-  {id:'weather',group:'weather',x:472,y:264,r:16,label:'Weather signals',meta:'OPEN-METEO · KARACHI'},
-  {id:'temperature',group:'weather',x:362,y:186,r:9,label:'Air temperature',parent:'weather'},
-  {id:'humidity',group:'weather',x:519,y:139,r:10,label:'Relative humidity',parent:'weather'},
-  {id:'wind',group:'weather',x:305,y:343,r:8,label:'Wind speed',parent:'weather'},
-  {id:'dew',group:'weather',x:372,y:419,r:7,label:'Dew point',parent:'weather'},
-  {id:'forecast',group:'forecast',x:865,y:272,r:19,label:'24-hour forecast',meta:'MACHINE LEARNING'},
-  {id:'heatindex',group:'forecast',x:1037,y:176,r:10,label:'Heat index',parent:'forecast'},
-  {id:'uncertainty',group:'forecast',x:1062,y:370,r:11,label:'Prediction interval',parent:'forecast'},
-  {id:'risk',group:'forecast',x:859,y:125,r:9,label:'Risk category',parent:'forecast'},
-  {id:'safety',group:'safety',x:834,y:574,r:17,label:'Worker safety',meta:'GUIDANCE → ACTION'},
-  {id:'hydration',group:'safety',x:1005,y:524,r:11,label:'Hydration',parent:'safety'},
-  {id:'rest',group:'safety',x:1000,y:667,r:9,label:'Rest & shade',parent:'safety'},
-  {id:'acclimatization',group:'safety',x:767,y:714,r:10,label:'Acclimatization',parent:'safety'},
-  {id:'evidence',group:'evidence',x:471,y:556,r:17,label:'Verified evidence',meta:'TRACEABLE BY DESIGN'},
-  {id:'model',group:'evidence',x:336,y:538,r:10,label:'ML performance',parent:'evidence'},
-  {id:'warehouse',group:'evidence',x:530,y:705,r:11,label:'Data warehouse',parent:'evidence'},
-  {id:'quality',group:'evidence',x:321,y:663,r:8,label:'Quality checks',parent:'evidence'},
-  {id:'sources',group:'evidence',x:644,y:615,r:9,label:'Official sources',parent:'evidence'}
-];
-const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const fmt = (n, digits=1) => Number.isFinite(Number(n)) ? Number(n).toFixed(digits) : '—';
-const temp = n => state.unit === 'F' ? n*1.8+32 : n;
-const date = (value, options={}) => new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Karachi',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true,...options}).format(new Date(value));
-const hour = value => date(value,{day:undefined,month:undefined,minute:undefined});
-const svgEl = (name, attrs, parent) => {const el=document.createElementNS(NS,name); for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v); if(parent)parent.appendChild(el); return el;};
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const NS='http://www.w3.org/2000/svg';
+const state={data:null,api:false,view:'overview',unit:'C',hours:24,selected:null,filter:null,zoom:1,pan:{x:0,y:0},orbit:false,paused:typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,loading:false};
+const labels={weather:'Weather',air:'Air quality',forecast:'Stored ML forecast',evidence:'Model evidence',safety:'Safety guidance'};
+const finite=v=>typeof v==='number'&&Number.isFinite(v);
+const fmt=(v,d=1)=>finite(v)?v.toFixed(d):'—';
+const temperature=v=>finite(v)?(state.unit==='F'?v*1.8+32:v):null;
+const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function date(value,options={}){if(!value||!Number.isFinite(new Date(value).getTime()))return 'Not available';return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Karachi',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true,...options}).format(new Date(value));}
+const clock=v=>date(v,{day:undefined,month:undefined});
+const day=v=>date(v,{hour:undefined,minute:undefined,weekday:'short'});
+const safeURL=u=>typeof u==='string'&&/^https:\/\//.test(u)?escapeHTML(u):'#';
+function weatherInfo(code,isDay=1){if(!finite(code))return ['◌','Conditions unavailable'];if(code===0)return isDay===0?['☾','Clear night']:['☀','Clear sky'];if(code<=2)return isDay===0?['☾','Partly cloudy']:['⛅','Partly cloudy'];if(code===3)return ['☁','Cloudy'];if([45,48].includes(code))return ['≋','Fog'];if(code>=95)return ['ϟ','Thunderstorms'];if([71,73,75,77,85,86].includes(code))return ['❄','Snow showers'];if(code>=51&&code<=67||code>=80&&code<=82)return ['☂','Rain'];return ['◌','Weather code '+code];}
+function rowsForWindow(rows,hours){if(!rows?.length)return [];const start=new Date(rows[0].time_utc).getTime();return rows.filter(r=>new Date(r.time_utc).getTime()<=start+hours*3600000);}
+function joinAir(weatherRows,airRows){const map=new Map((airRows||[]).map(r=>[new Date(r.time_utc).getTime(),r]));return weatherRows.map(r=>({...r,air:map.get(new Date(r.time_utc).getTime())||null}));}
+function segments(rows,key,transform=v=>v){const out=[];let part=[];for(const row of rows){const t=new Date(row.time_utc).getTime(),v=transform(row[key]);if(Number.isFinite(t)&&finite(v))part.push([t,v]);else if(part.length){out.push(part);part=[];}}if(part.length)out.push(part);return out;}
+const svgEl=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));parent?.appendChild(e);return e;};
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3000);}
+function badge(status){const names={live:'Recent model data',stored:'Stored snapshot',historical:'Historical data',cached_stale:'Cached · refresh failed',stale:'Source data is old',unavailable:'Unavailable',verified:'Verified'};return `<span class="source-badge ${escapeHTML(status)}"><i class="status-dot"></i>${escapeHTML(names[status]||status)}</span>`;}
+function controls(){return `<div class="page-controls"><div class="segmented" aria-label="Forecast time range">${[24,48].map(h=>`<button data-hours="${h}" class="${state.hours===h?'active':''}">${h} hours</button>`).join('')}</div><div class="segmented" aria-label="Temperature unit">${['C','F'].map(u=>`<button data-unit="${u}" class="${state.unit===u?'active':''}">°${u}</button>`).join('')}</div></div>`;}
+const heading=(eyebrow,title,description,withControls=false)=>`<div class="page-heading"><div><span class="eyebrow">${eyebrow}</span><h2>${title}</h2><p>${description}</p></div>${withControls?controls():''}</div>`;
+const cardHead=(eyebrow,title,description='',status='')=>`<div class="card-header"><div><span class="eyebrow">${eyebrow}</span><h3>${title}</h3>${description?`<p>${description}</p>`:''}</div>${status?badge(status):''}</div>`;
+const chartBox=id=>`<div class="chart" id="${id}"></div><div class="chart-tooltip" id="${id}-tooltip">Hover, tap or focus a point to see its value.</div>`;
+const scale=()=>'<div class="aqi-scale" aria-label="US AQI bands from good to hazardous"><i></i><i></i><i></i><i></i><i></i><i></i></div>';
 
-async function loadData(initial=false){
-  $('#refresh-button').disabled=true;
-  let data;
-  try {
-    const response=await fetch('/api/dashboard',{signal:AbortSignal.timeout(5000)});
-    if(!response.ok || !response.headers.get('content-type')?.includes('application/json'))throw Error('Python API unavailable');
-    data=await response.json();state.api=true;
-  } catch {
-    state.api=false;
-    try {const response=await fetch('snapshot.json',{cache:'no-store'});if(!response.ok)throw Error('Missing snapshot');data=await response.json();}
-    catch {$('#data-mode').textContent='Evidence unavailable';$('#updated-label').textContent='Try refreshing';$('#refresh-button').disabled=false;$('#detail-content').innerHTML='<h2 class="detail-title">Evidence unavailable</h2><p class="detail-subtitle">The saved evidence could not be loaded. Refresh to try again.</p>';toast('Unable to load project evidence.');return;}
-  }
-  state.data=data;
-  const age=Date.now()-new Date(data.freshness.collected_at_utc).getTime();
-  data.fresh=data.verified && age>=0 && age<=3*60*60*1000;
-  const bundled=state.api && ['vercel','deployment'].includes(data.storage?.location);
-  const apiName=data.storage?.location==='vercel'?'Vercel API':'Packaged API';
-  $('#data-mode').textContent=state.api?(bundled?(data.fresh?apiName+' connected':apiName+' · stale data'):(data.fresh?'Warehouse connected':'Stored data · stale')):'Project snapshot';
-  $('.data-status .status-dot').classList.toggle('stale',!data.fresh || !state.api);
-  $('#updated-label').textContent=date(data.freshness.collected_at_utc)+' PKT';
-  $('.data-status').title=`Collected ${date(data.freshness.collected_at_utc)} PKT. ${state.api?(bundled?'Read from the read-only DuckDB file bundled with this deployment. Data updates require redeployment.':'Read from local DuckDB.'):'Saved project evidence; this is not a live weather feed.'} ${data.fresh?'':'Older than the three-hour freshness limit.'}`;
-  $('#dock-heat').innerHTML=fmt(data.forecast.model_prediction_c)+'<small>°C</small>';
-  $('#dock-risk').textContent=data.forecast.model_risk_category;
-  $('#dock-mae').innerHTML=fmt(data.metrics.test_model_mae_c,2)+'<small>°C</small>';
-  if(initial){buildNetwork();if(innerWidth<=720)$('#detail-panel').classList.add('closed');}
-  showDetail(state.selected,false);
-  if(state.view!=='network')showView(state.view);
-  $('#refresh-button').disabled=false;
-  if(!initial)toast(state.api?'Warehouse evidence refreshed.':'Saved project snapshot reloaded.');
+async function loadData(manual=false){
+ if(state.loading)return;state.loading=true;$('#refresh-button').disabled=true;
+ try{
+  let data;try{const r=await fetch('/api/dashboard',{signal:AbortSignal.timeout(15000),cache:'no-store'});if(!r.ok||!r.headers.get('content-type')?.includes('application/json'))throw Error();data=await r.json();state.api=true;}catch{const r=await fetch('snapshot.json',{cache:'no-store'});if(!r.ok)throw Error('The API and saved snapshot are unavailable.');data=await r.json();state.api=false;}
+  if(!data.weather||!data.air_quality||!data.network)throw Error('Dashboard data is incomplete. Rebuild the deployment package.');
+  for(const feed of [data.weather,data.air_quality]){const age=(Date.now()-new Date(feed.valid_at_utc).getTime())/1000;if(feed.status==='live'&&(!Number.isFinite(age)||age>10800||age< -3600))feed.status='stale';} const forecastAge=(Date.now()-new Date(data.freshness.collected_at_utc).getTime())/1000;data.fresh=Boolean(data.verified&&forecastAge>=0&&forecastAge<=10800);state.data=data;state.lastLoad=Date.now();updateHeader();render();
+  if(manual)toast(state.api?'Dashboard checked. Source timestamps show when the cache last refreshed.':'API unavailable. Showing the saved snapshot.');
+ }catch(e){if(!state.data)$('#content-view').innerHTML=`<div class="loading-state"><h2>Unable to load the dashboard</h2><p>${escapeHTML(e.message)}</p></div>`;toast(e.message);}
+ finally{state.loading=false;$('#refresh-button').disabled=false;}
 }
+function updateHeader(){
+ const d=state.data,w=d.weather,a=d.air_quality,c=w.current;
+ $('#connection-label').textContent=!state.api?'Saved snapshot':w.status==='live'&&a.status==='live'&&finite(a.current.us_aqi)?'Weather + AQI connected':w.status==='live'?'Weather connected · AQI limited':'Source data limited';
+ $('#connection-dot').classList.toggle('stale',!state.api||w.status!=='live'||a.status!=='live'||!finite(a.current.us_aqi));
+ const pulls=[w.fetched_at_utc,a.fetched_at_utc].filter(Boolean).map(v=>new Date(v).getTime());
+ $('#last-pull').textContent='Last source pull: '+(pulls.length?date(Math.max(...pulls))+' PKT':'Unavailable');
+ $('.last-pull').title=`Weather pulled: ${date(w.fetched_at_utc)} PKT\nAir pulled: ${date(a.fetched_at_utc)} PKT\nServer response: ${date(d.server_response_at_utc)} PKT\nModel data, not on-site sensors.`;
+ const kpis=[['☀','TEMPERATURE',temperature(c.temperature_c),'°'+state.unit,w.status==='live'?'Weather model':'Stored weather'],['◈','HEAT INDEX',temperature(c.heat_index_c),'°'+state.unit,'Calculated feels-like'],['≋','US AQI',a.current.us_aqi,'',a.current.aqi_category],['◌','HUMIDITY',c.humidity_pct,'%','Relative humidity'],['↝','WIND',c.wind_speed_ms,'m/s','At 10 metres']];
+ $('#pulse-kpis').innerHTML=kpis.map(([icon,label,value,unit,note])=>`<div class="pulse-kpi"><div class="kpi-label"><span>${icon}</span>${label}</div><strong>${fmt(value,label==='US AQI'||label==='HUMIDITY'?0:1)}<small>${unit}</small></strong><div class="kpi-note" title="${escapeHTML(note)}">${escapeHTML(note)}</div></div>`).join('');
+}
+function showView(view,scroll=true){state.view=view;render();if(scroll)window.scrollTo({top:0,behavior:'instant'});}
+function render(){
+ if(!state.data)return;$$('.view-tab').forEach(b=>{b.classList.toggle('active',b.dataset.view===state.view);b.setAttribute('aria-current',b.dataset.view===state.view?'page':'false');});
+ $('#network-view').hidden=state.view!=='network';$('#content-view').hidden=state.view==='network';
+ if(state.view==='network'){buildNetwork();return;}
+ $('#content-view').innerHTML=({overview:overviewView,forecast:forecastView,air:airView,evidence:evidenceView}[state.view]||overviewView)();
+ $$('[data-view-link]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.viewLink)));
+ $$('[data-hours]').forEach(b=>b.addEventListener('click',()=>{state.hours=Number(b.dataset.hours);render();}));
+ $$('[data-unit]').forEach(b=>b.addEventListener('click',()=>{state.unit=b.dataset.unit;updateHeader();render();}));
+ drawViewCharts();
+}
+function liveNotice(){const d=state.data;const issues=[];if(!state.api)issues.push('Saved snapshot: the Python API is unavailable.');if(d.weather.status!=='live')issues.push(d.weather.note);if(d.air_quality.status!=='live')issues.push(d.air_quality.note);else if(!finite(d.air_quality.current.us_aqi))issues.push('The current AQI index is unavailable; valid pollutant values may still be shown.');return issues.length?`<div class="callout"><span>◷</span><p>${issues.map(escapeHTML).join(' ')}</p></div>`:'';}
+function weatherCard(){const w=state.data.weather;return `<article class="card panel">${cardHead('WEATHER OUTLOOK','How the day will feel','Air temperature and calculated heat index · °'+state.unit,w.status)}${chartBox('weather-chart')}<div class="chart-legend"><span><i style="background:var(--weather)"></i>Air temperature</span><span><i style="background:var(--forecast)"></i>Heat index</span></div><div class="chart-note">Source valid at ${date(w.valid_at_utc)} PKT. The heat-index line is calculated from forecast temperature and humidity. It is not a continuous ML prediction.</div></article>`;}
+function airCard(){const a=state.data.air_quality;return `<article class="card panel">${cardHead('AIR QUALITY','A clearer view of the air','US AQI · CAMS model estimate',a.status)}<div class="card-stat">${fmt(a.current.us_aqi,0)}<small>US AQI</small></div><div class="aqi-category">${escapeHTML(a.current.aqi_category)}</div>${scale()}${chartBox('aqi-chart')}<div class="chart-note">${a.current.us_aqi===null?'No current AQI is available. Historical concentrations are shown separately.':'Source valid at '+date(a.valid_at_utc)+' PKT. US AQI is an index; pollutant concentrations use µg/m³.'}</div></article>`;}
+function dailyCards(){const w=state.data.weather;let days=w.daily||[];if(!days.length){const groups=new Map();for(const r of w.hourly){const k=day(r.time_utc);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}days=[...groups.values()].slice(0,3).map(rows=>({time_utc:rows[0].time_utc,min_c:Math.min(...rows.map(r=>r.temperature_c).filter(finite)),max_c:Math.max(...rows.map(r=>r.temperature_c).filter(finite)),weather_code:null}));}return days.slice(0,3).map(d=>{const [icon,text]=weatherInfo(d.weather_code);return `<div class="day-card"><span class="weather-symbol" role="img" aria-label="${escapeHTML(text)}">${icon}</span><div><strong>${day(d.time_utc)}</strong><p>${escapeHTML(text)}</p></div><div class="day-temps">${fmt(temperature(d.max_c),0)}°<small>${fmt(temperature(d.min_c),0)}°</small></div></div>`;}).join('');}
+function weatherTable(){const d=state.data,rows=joinAir(rowsForWindow(d.weather.hourly,state.hours),d.air_quality.hourly).filter((_,i)=>i%3===0);return `<article class="card panel wide">${cardHead('PLAN YOUR HOURS','A simple hourly outlook','All times in Karachi · model forecasts, not site sensors')}<div class="table-wrapper"><table class="minimal-table"><thead><tr><th>TIME · PKT</th><th>WEATHER</th><th>TEMPERATURE</th><th>HEAT INDEX</th><th>HUMIDITY</th><th>WIND</th><th>US AQI</th></tr></thead><tbody>${rows.map(r=>{const [icon,description]=weatherInfo(r.weather_code,r.is_day);return `<tr><td><div class="time-cell"><span class="time-icon" role="img" aria-label="${escapeHTML(description)}">${icon}</span><span><strong>${clock(r.time_utc)}</strong><small>${day(r.time_utc)}</small></span></div></td><td class="table-weather">${escapeHTML(description)}</td><td>${fmt(temperature(r.temperature_c))}°${state.unit}</td><td>${fmt(temperature(r.heat_index_c))}°${state.unit}</td><td>${fmt(r.humidity_pct,0)}%</td><td>${fmt(r.wind_speed_ms)} m/s</td><td>${fmt(r.air?.us_aqi,0)}</td></tr>`;}).join('')}</tbody></table></div></article>`;}
+function overviewView(){return heading('ONE CITY. ONE CONNECTED VIEW.','A little clarity. <span>A safer day.</span>','Weather, air quality and heat evidence for Karachi. See the value, the time and the source.',true)+liveNotice()+`<div class="dashboard-grid">${weatherCard()}${airCard()}<article class="card panel wide">${cardHead('LOOKING AHEAD','The next few days','Daily high / low temperatures · '+(state.data.weather.daily?.length?'weather model outlook':'range of stored hourly values'))}<div class="daily-strip">${dailyCards()}</div></article>${weatherTable()}<div class="callout wide"><span>↻</span><p><strong>Fresh checks, clear limits.</strong> While this page is open, it checks the API every 5 minutes. Upstream responses are cached for 15 minutes per Python instance. The stored ML forecast and DuckDB snapshot do not automatically update. <button class="card-link" data-view-link="evidence">See sources & update details ↗</button></p></div></div>`;}
+function modelCard(){const d=state.data,f=d.forecast;return `<article class="card panel wide">${cardHead('YOUR PROJECT’S TRAINED MODEL','Stored 24-hour ML prediction','A separate result from your original pipeline',d.fresh?'verified':'stale')}<div class="model-card"><div><div class="card-stat">${fmt(temperature(f.model_prediction_c))}<small>°${state.unit}</small></div><div class="card-stat-note">${escapeHTML(f.model_risk_category)}</div></div><div class="model-explanation"><p>Target: <strong>${date(f.target_time_utc)} PKT</strong><br>Collected: ${date(d.freshness.collected_at_utc)} PKT<br>Historical interval: ${fmt(temperature(f.interval_lower_c))}–${fmt(temperature(f.interval_upper_c))}°${state.unit}</p><p>The live line above uses a heat-index formula. This ML point comes from the saved database. The website does not rerun the model; historical interval coverage is not guaranteed for live inputs.</p></div></div></article>`;}
+function forecastView(){return heading('AHEAD OF THE HEAT','Find your window.','Compare temperature, heat index and humidity. The separate model card shows the stored ML prediction.',true)+liveNotice()+`<div class="dashboard-grid">${weatherCard()}<article class="card panel">${cardHead('HUMIDITY','The moisture in the air','Relative humidity · percent')}${chartBox('humidity-chart')}<div class="chart-note">Higher humidity can affect how heat feels. Heat index combines temperature and relative humidity.</div></article>${weatherTable()}${modelCard()}</div>`;}
+function airView(){const a=state.data.air_quality;return heading('BREATHE WITH MORE CONTEXT','The air, made visible.','US AQI and pollutant concentrations from CAMS via Open-Meteo. Historical project data stays clearly separated.',true)+liveNotice()+`<div class="pollutants">${[['PM2.5','pm2_5'],['PM10','pm10'],['Nitrogen dioxide','nitrogen_dioxide'],['Ozone','ozone']].map(([name,key])=>`<article class="pollutant panel"><h3>${name}</h3><strong>${fmt(a.current[key])}</strong><small>µg/m³ · ${a.status==='historical'?'historical value':date(a.valid_at_utc)+' PKT'}</small></article>`).join('')}</div><div class="dashboard-grid">${airCard()}<article class="card panel">${cardHead('PARTICULATE MATTER','PM2.5 & PM10 outlook','Forecast concentrations · µg/m³')}${chartBox('particles-chart')}<div class="chart-legend"><span><i style="background:var(--air)"></i>PM2.5</span><span><i style="background:var(--safety)"></i>PM10</span></div></article><article class="card panel wide">${cardHead('YOUR EXISTING DATASET','Historical particulate trend','Monthly mean · original CAMS project data · µg/m³','historical')}${chartBox('history-chart')}<div class="chart-note">This chart uses the cleaned.cams_air_quality table in the bundled DuckDB warehouse. Monthly pollutant concentrations are not today’s AQI. No AQI score is invented from the archive.</div></article></div><p class="chart-note">Attribution: CAMS ENSEMBLE / CAMS Global and Open-Meteo. <a href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noopener noreferrer">Source documentation ↗</a></p>`;}
+function evidenceView(){const d=state.data,w=d.weather,a=d.air_quality;const rows=[['Weather data valid at',date(w.valid_at_utc)+' PKT'],['Weather last source pull',date(w.fetched_at_utc)+' PKT'],['Air data valid at',date(a.valid_at_utc)+' PKT'],['Air last source pull',date(a.fetched_at_utc)+' PKT'],['Last backend response',date(d.server_response_at_utc)+' PKT'],['Page checks','Every 5 minutes while open'],['Upstream API cache','15 minutes per Python instance'],['Scheduled Prefect job on Vercel','Not running'],['Bundled DuckDB updates','Manual rebuild and redeploy'],['Stored ML input collected',date(d.freshness.collected_at_utc)+' PKT']];return heading('THE EVIDENCE BEHIND THE PICTURE','Every number has a story.','Source dates, update behavior and model evaluation—without the guesswork.')+`<div class="callout"><span>◎</span><p><strong>Where the database runs.</strong> ${state.data.storage?'DuckDB runs inside the Python backend with a read-only bundled file. It does not contact your computer.':'In local mode DuckDB reads the project file on your computer; on Vercel it reads the bundled deployment copy.'} Live weather/AQI requests do not write into that database.</p></div><div class="dashboard-grid"><article class="card panel">${cardHead('UPDATE STATUS','What updates, and when?')}<dl class="update-list">${rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${escapeHTML(v)}</dd></div>`).join('')}</dl><p class="chart-note">No background pipeline or cloud cron is enabled. New Vercel instances have their own caches and can fetch sooner. When nobody requests the site, nothing refreshes. The original Prefect configuration is hourly, but it requires a running worker outside this deployment.</p></article><article class="card panel">${cardHead('MODEL EVALUATION','Measured, not assumed','Held-out 2025 test data')}<div class="mini-stats"><div><strong>${fmt(d.metrics.test_model_mae_c,2)}°C</strong><span>Mean absolute error</span></div><div><strong>${fmt(d.metrics.test_model_r2,3)}</strong><span>Test R²</span></div><div><strong>${Number(d.metrics.test_rows).toLocaleString()}</strong><span>Test hours</span></div></div><p class="card-description" style="margin-top:20px">The model is compared against same-hour previous-day persistence. Its baseline test error is ${fmt(d.metrics.test_baseline_mae_c,3)}°C. Risk-category accuracy is ${fmt(d.risk_metrics.accuracy*100,1)}%, derived from heat index rather than observed worker illness.</p><p class="chart-note">Weather sources are model estimates, not personal exposure or occupational WBGT measurements. The safety assistant retrieves official evidence; it is not a generative medical model.</p><a class="card-link" href="https://open-meteo.com/en/docs" target="_blank" rel="noopener noreferrer">Weather API documentation ↗</a><br><a class="card-link" href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noopener noreferrer">Air-quality API documentation ↗</a></article></div><h3 class="page-section-title">Official safety knowledge</h3><div class="source-list">${d.sources.map((s,i)=>`<article class="source-card panel"><span class="eyebrow">SOURCE 0${i+1}</span><h3>${escapeHTML(s.publisher)}</h3><p>${escapeHTML(s.title)}</p><a href="${safeURL(s.url)}" target="_blank" rel="noopener noreferrer">Read the official guidance ↗</a></article>`).join('')}</div>`;}
 
-function positions(){
-  if(!state.orbit)return nodes;
-  return nodes.map((n,i)=>{const groupIndex=Object.keys(groups).indexOf(n.group);const groupNodes=nodes.filter(m=>m.group===n.group);const j=groupNodes.findIndex(m=>m.id===n.id);const a=-Math.PI+groupIndex*Math.PI/2+j*.19;const r=n.parent?290:160;return {...n,x:705+Math.cos(a)*r,y:398+Math.sin(a)*r};});
+let chartSequence=0;
+function drawChart(id,rows,series,{area=false,unit='',monthly=false,zero=false}={}){
+ const container=$('#'+id);if(!container)return;const validRows=(rows||[]).filter(r=>Number.isFinite(new Date(r.time_utc).getTime()));const prepared=series.map(s=>({...s,parts:segments(validRows,s.key,s.transform||((v)=>v))}));const values=prepared.flatMap(s=>s.parts.flatMap(p=>p.map(x=>x[1])));
+ if(validRows.length<2||!values.length){container.innerHTML='<div class="chart-empty">No values available for this period.<br>See the source status and historical data below.</div>';$('#'+id+'-tooltip').textContent='Missing values are not plotted as zero.';return;}
+ const W=660,H=215,L=38,R=12,T=15,B=32,times=validRows.map(r=>new Date(r.time_utc).getTime()),start=Math.min(...times),end=Math.max(...times);let min=zero?0:Math.min(...values),max=Math.max(...values);const pad=Math.max((max-min)*.15,unit==='%'?3:1);if(!zero)min-=pad;max+=pad;const x=t=>L+(t-start)/Math.max(1,end-start)*(W-L-R),y=v=>H-B-(v-min)/(max-min)*(H-T-B);
+ const svg=svgEl('svg',{viewBox:`0 0 ${W} ${H}`,role:'group','aria-label':series.map(s=>s.label).join(' and ')+' chart'},container);svgEl('title',{},svg).textContent=series.map(s=>s.label).join(' and ')+', '+unit;const defs=svgEl('defs',{},svg);
+ for(let i=0;i<=4;i++){const v=min+(max-min)*i/4;svgEl('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),class:'chart-grid'},svg);svgEl('text',{x:L-7,y:y(v)+3,'text-anchor':'end',class:'chart-label'},svg).textContent=fmt(v,0)+(unit==='°'?'°':'');}
+ for(let i=0;i<5;i++){const row=validRows[Math.round((validRows.length-1)*i/4)];const label=monthly?date(row.time_utc,{day:undefined,hour:undefined,minute:undefined}):clock(row.time_utc);svgEl('text',{x:x(new Date(row.time_utc).getTime()),y:H-8,'text-anchor':i===0?'start':i===4?'end':'middle',class:'chart-label'},svg).textContent=label;}
+ prepared.forEach(s=>{const color=getComputedStyle(document.documentElement).getPropertyValue(s.color).trim();const gradientId='fill-'+(++chartSequence),gradient=svgEl('linearGradient',{id:gradientId,x1:0,x2:0,y1:0,y2:1},defs);svgEl('stop',{offset:'0%', 'stop-color':color,'stop-opacity':'.25'},gradient);svgEl('stop',{offset:'100%','stop-color':color,'stop-opacity':'.01'},gradient);
+  s.parts.forEach(part=>{const path=part.map(([t,v],i)=>`${i?'L':'M'}${x(t)},${y(v)}`).join(' ');if(area)svgEl('path',{d:path+` L${x(part.at(-1)[0])},${H-B} L${x(part[0][0])},${H-B}Z`,fill:`url(#${gradientId})`},svg);svgEl('path',{d:path,fill:'none',stroke:color,'stroke-width':'2'},svg);
+   part.forEach(([t,v],i)=>{if(i%3&&i!==part.length-1)return;const dot=svgEl('circle',{cx:x(t),cy:y(v),r:5,fill:color,'fill-opacity':'.01',tabindex:'0',role:'button','aria-label':`${date(t)} PKT, ${s.label}: ${fmt(v)} ${unit}`},svg);const show=()=>{$('#'+id+'-tooltip').textContent=`${date(t)} PKT · ${s.label}: ${fmt(v)} ${unit}`;dot.setAttribute('fill-opacity','1');};dot.addEventListener('mouseenter',show);dot.addEventListener('focus',show);dot.addEventListener('click',show);dot.addEventListener('mouseleave',()=>dot.setAttribute('fill-opacity','.01'));});});
+ });
 }
+function drawViewCharts(){const d=state.data,w=rowsForWindow(d.weather.hourly,state.hours),a=rowsForWindow(d.air_quality.hourly,state.hours);drawChart('weather-chart',w,[{key:'temperature_c',label:'Temperature',color:'--weather',transform:temperature},{key:'heat_index_c',label:'Heat index',color:'--forecast',transform:temperature}],{unit:'°'+state.unit});drawChart('aqi-chart',a,[{key:'us_aqi',label:'US AQI',color:'--air'}],{area:true,unit:'US AQI',zero:true});drawChart('humidity-chart',w,[{key:'humidity_pct',label:'Relative humidity',color:'--weather'}],{area:true,unit:'%',zero:true});drawChart('particles-chart',a,[{key:'pm2_5',label:'PM2.5',color:'--air'},{key:'pm10',label:'PM10',color:'--safety'}],{unit:'µg/m³',zero:true});drawChart('history-chart',d.air_history.monthly,[{key:'pm2_5',label:'Historical PM2.5 monthly mean',color:'--air'}],{area:true,unit:'µg/m³',monthly:true,zero:true});}
+
+function nodeValue(n){if(n.id==='mae')return fmt(n.value,2)+' °C';return typeof n.value==='string'?n.value:finite(n.value)?fmt(n.unit==='°C'?temperature(n.value):n.value,n.id==='aqi'?0:n.id==='r2'?3:1)+(n.unit?' '+(n.unit==='°C'?'°'+state.unit:n.unit):''):'';}
+function graphPositions(network,orbit=false){const groups=network.nodes.filter(n=>n.parent==='karachi');return network.nodes.map(n=>{if(n.id==='karachi')return {...n,x:705,y:410,r:30};const g=groups.findIndex(g=>g.id===(n.parent==='karachi'?n.id:n.parent));const angle=-Math.PI*.78+Math.max(0,g)*Math.PI*2/Math.max(1,groups.length);if(n.parent==='karachi')return {...n,x:705+Math.cos(angle)*185,y:410+Math.sin(angle)*185,r:16};const siblings=network.nodes.filter(s=>s.parent===n.parent),i=siblings.findIndex(s=>s.id===n.id);const spread=(i-(siblings.length-1)/2)*.24;const distance=orbit?285:280+(i%2)*22;return {...n,x:705+Math.cos(angle+spread)*distance,y:410+Math.sin(angle+spread)*distance,r:8};});}
 function buildNetwork(){
-  const points=positions();const edgeGroup=$('#edges'),nodeGroup=$('#nodes'),particleGroup=$('#particles');
-  edgeGroup.replaceChildren();nodeGroup.replaceChildren();particleGroup.replaceChildren();
-  [126,243,352].forEach(r=>svgEl('circle',{cx:705,cy:398,r,class:'orbit-ring'},edgeGroup));
-  const pathFor=(a,b)=>{const bend=b.parent?20:0;return `M ${a.x} ${a.y} Q ${(a.x+b.x)/2+bend} ${(a.y+b.y)/2-bend} ${b.x} ${b.y}`;};
-  points.forEach((node,i)=>{
-    const parent=points.find(p=>p.id===node.parent)||{x:705,y:398};
-    const path=svgEl('path',{d:pathFor(parent,node),class:`graph-edge ${node.parent?'':'main'}`,id:`edge-${node.id}`,'data-group':node.group},edgeGroup);
-    const pulse=svgEl('circle',{r:node.parent?1.5:2,fill:groups[node.group].color,opacity:'.85','data-group':node.group},particleGroup);
-    const motion=svgEl('animateMotion',{dur:`${6+i%5}s`,repeatCount:'indefinite',begin:`-${i*.73}s`,path:path.getAttribute('d')},pulse);
-    for(let j=0;j<(node.parent?2:4);j++){
-      const seed=(i*7+j*13+3);const a=seed*2.39996;const distance=26+(seed%38);const x=node.x+Math.cos(a)*distance,y=node.y+Math.sin(a)*distance;
-      svgEl('path',{d:`M${node.x},${node.y} L${x},${y}`,class:'graph-edge','data-group':node.group,opacity:'.35'},edgeGroup);
-      svgEl('circle',{cx:x,cy:y,r:1.7+(j%2),fill:groups[node.group].color,opacity:'.6','data-group':node.group},particleGroup);
-      svgEl('circle',{cx:x,cy:y,r:4,fill:groups[node.group].color,filter:'url(#glow)',opacity:'.4','data-group':node.group},particleGroup);
-    }
-    const g=svgEl('g',{class:'graph-node',transform:`translate(${node.x} ${node.y})`,tabindex:'0',role:'button','aria-label':`Explore ${node.label}`,'data-id':node.id,'data-group':node.group},nodeGroup);
-    svgEl('title',{},g).textContent=`${node.label} — select to explore evidence`;
-    svgEl('circle',{r:Math.max(22,node.r+5),fill:'transparent'},g);
-    svgEl('circle',{r:node.r+9,fill:groups[node.group].color,filter:'url(#glow)',class:'node-halo ambient',style:`animation-delay:-${i*.41}s`},g);
-    svgEl('circle',{r:node.r+3,fill:'none',stroke:groups[node.group].color,'stroke-opacity':'.25','stroke-width':'.7'},g);
-    svgEl('circle',{r:node.r,fill:`url(#${groups[node.group].fill}-fill)`,stroke:groups[node.group].color,'stroke-opacity':'.7','stroke-width':'.8',class:'node-body'},g);
-    svgEl('circle',{r:node.r+9,fill:'none',stroke:groups[node.group].color,'stroke-width':'1',class:'selection-ring'},g);
-    svgEl('circle',{cx:-node.r*.3,cy:-node.r*.35,r:node.r*.23,fill:'#efffe9',opacity:'.35',filter:'url(#glow)'},g);
-    const leftLabel=['temperature','wind','dew','model','quality'].includes(node.id);
-    const label=svgEl('text',{x:leftLabel?-node.r-11:node.r+12,y:node.meta?-2:3,'text-anchor':leftLabel?'end':'start',class:'node-label'},g);label.textContent=node.label;
-    const meta=svgEl('text',{x:leftLabel?-node.r-11:node.r+12,y:node.meta?12:16,'text-anchor':leftLabel?'end':'start',class:'node-meta'},g);meta.textContent=node.meta||nodeMeta(node.id);
-    const select=()=>{showView('network');showDetail(node.id);};g.addEventListener('click',select);g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}});
-  });
-  [['weather','evidence'],['forecast','safety'],['humidity','heatindex'],['quality','forecast'],['sources','safety']].forEach(([a,b])=>{const p=points.find(n=>n.id===a),q=points.find(n=>n.id===b);svgEl('path',{d:`M${p.x},${p.y} L${q.x},${q.y}`,class:'graph-edge cross'},edgeGroup);});
-  const core=svgEl('g',{class:'graph-node core-node',tabindex:'0',role:'button','aria-label':'Karachi heat intelligence overview','data-id':'core'},nodeGroup);
-  svgEl('circle',{cx:705,cy:398,r:60,fill:'#e8d29b',opacity:'.15',filter:'url(#core-glow)'},core);
-  [39,45,51].forEach((r,i)=>svgEl('circle',{cx:705,cy:398,r,fill:'none',stroke:'#c8bd87','stroke-width':i===1?'.8':'.5','stroke-opacity':'.35','stroke-dasharray':i===1?'1 4':'none',class:i===1?'core-orbit':''},core));
-  svgEl('circle',{cx:705,cy:398,r:32,fill:'url(#core-fill)',stroke:'#e5d09a','stroke-width':'1'},core);
-  svgEl('circle',{cx:705,cy:398,r:25,fill:'none',stroke:'#fff2c3','stroke-width':'.5','stroke-opacity':'.6'},core);
-  svgEl('circle',{cx:705,cy:398,r:19,fill:'none',stroke:'#fff2c3','stroke-width':'.5','stroke-opacity':'.4'},core);
-  svgEl('text',{x:705,y:402,'text-anchor':'middle',class:'core-value'},core).textContent='✳';
-  svgEl('text',{x:705,y:464,'text-anchor':'middle',class:'core-label'},core).textContent='Karachi';
-  svgEl('text',{x:705,y:480,'text-anchor':'middle',class:'core-meta'},core).textContent='HEAT INTELLIGENCE';
-  core.addEventListener('click',()=>showDetail('core'));core.addEventListener('keydown',e=>{if(e.key==='Enter'){showDetail('core');}});
-  updateFilter();updateSelection();
+ const graph=state.data.network,points=graphPositions(graph,state.orbit),edgeGroup=$('#edges'),nodeGroup=$('#nodes');edgeGroup.replaceChildren();nodeGroup.replaceChildren();
+ [135,235,335].forEach(r=>svgEl('circle',{cx:705,cy:410,r,fill:'none',stroke:'var(--border)','stroke-opacity':'.4'},edgeGroup));
+ graph.links.forEach(link=>{const a=points.find(n=>n.id===link.source),b=points.find(n=>n.id===link.target);if(a&&b)svgEl('path',{d:`M${a.x},${a.y} Q${(a.x+b.x)/2+10},${(a.y+b.y)/2-10} ${b.x},${b.y}`,class:'graph-edge','data-group':b.group},edgeGroup);});
+ points.forEach(n=>{const root=n.id==='karachi',color=root?'var(--gold)':`var(--${n.group})`;const g=svgEl('g',{class:'graph-node'+(state.selected===n.id?' selected':''),transform:`translate(${n.x} ${n.y})`,style:`--node-color:${color}`,tabindex:'0',role:'button','aria-label':`Explore ${n.label}${nodeValue(n)?': '+nodeValue(n):''}`,'data-id':n.id,'data-group':n.group},nodeGroup);svgEl('circle',{r:n.r+16,filter:'url(#glow)',class:'node-halo'},g);svgEl('circle',{r:n.r,fill:'var(--panel2)',class:'node-circle'},g);svgEl('circle',{r:n.r*.45,fill:color,opacity:'.65'},g);const left=n.x<650,tx=left?-n.r-11:n.r+11;const text=svgEl('text',{x:root?0:tx,y:root?53:-2,'text-anchor':root?'middle':left?'end':'start',class:root?'core-label':'node-label'},g);text.textContent=n.label;const value=svgEl('text',{x:root?0:tx,y:root?70:13,'text-anchor':root?'middle':left?'end':'start',class:root?'core-note':'node-value'},g);value.textContent=root?'CONNECTED CITY DATA':nodeValue(n);const select=()=>showNode(n.id);g.addEventListener('click',select);g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}});});
+ const groups=graph.nodes.filter(n=>n.parent==='karachi');$('#legend').innerHTML='<span class="eyebrow">FOCUS YOUR VIEW</span>'+groups.map(n=>`<button class="legend-item" data-filter="${n.group}" aria-pressed="${state.filter===n.group}" style="--node-color:var(--${n.group})"><i></i>${escapeHTML(n.label)}<span>${graph.nodes.filter(x=>x.group===n.group).length}</span></button>`).join('');$$('[data-filter]').forEach(b=>b.addEventListener('click',()=>{state.filter=state.filter===b.dataset.filter?null:b.dataset.filter;filterGraph();}));filterGraph();applyTransform();if(state.selected&&!graph.nodes.some(n=>n.id===state.selected)){state.selected=null;$('#detail-panel').hidden=true;}else if(state.selected&&!$('#detail-panel').hidden)showNode(state.selected);
 }
-function nodeMeta(id){const d=state.data;if(!d)return '';const w=d.current,f=d.forecast;return ({temperature:fmt(w.temperature_c)+' °C',humidity:fmt(w.humidity_pct,0)+' %',wind:fmt(w.wind_speed_ms)+' m/s',dew:fmt(w.dew_point_c)+' °C',heatindex:fmt(f.model_prediction_c)+' °C · ML',uncertainty:'HISTORICALLY CALIBRATED',risk:f.model_risk_category.toUpperCase(),hydration:'CDC NIOSH',rest:'NIOSH · HSE',acclimatization:'GRADUAL EXPOSURE',model:fmt(d.metrics.test_model_mae_c,2)+' °C TEST MAE',warehouse:'DUCKDB · GOLD LAYER',quality:d.verified?'EVIDENCE CHECKS PASSED':'CHECKS UNAVAILABLE',sources:'NIOSH · HSE · NOAA'})[id]||'';}
-function updateSelection(){
-  $$('.graph-node').forEach(n=>n.classList.toggle('selected',n.dataset.id===state.selected));
-  $$('.graph-edge').forEach(e=>e.classList.toggle('selected-edge',e.id===`edge-${state.selected}`));
-}
-function updateFilter(){
-  $$('[data-group]',$('#network')).forEach(el=>{el.style.opacity=!state.filter||el.dataset.group===state.filter?'':'0.08';});
-  $$('.legend-item').forEach(b=>b.setAttribute('aria-pressed',b.dataset.filter===state.filter));
-}
-function showDetail(id,open=true){
-  state.selected=id;updateSelection();const d=state.data;if(!d)return;const f=d.forecast,w=d.current;
-  const source=(label)=>`<div class="source-line">EVIDENCE<br><code>${escapeHTML(label)}</code><br>Collected ${escapeHTML(date(d.freshness.collected_at_utc))} PKT${!d.fresh?' · STALE':''}</div>`;
-  const grid=(items)=>`<div class="detail-grid">${items.map(([v,k])=>`<div><strong>${v}</strong><span>${escapeHTML(k)}</span></div>`).join('')}</div>`;
-  const section=(title,text)=>`<div class="detail-section"><h3>${escapeHTML(title)}</h3><p>${escapeHTML(text)}</p></div>`;
-  const button=(label,action)=>`<button class="detail-action" data-action="${action}">${escapeHTML(label)} <span>↗</span></button>`;
-  const headings={core:['CONNECTED INTELLIGENCE','Karachi, Pakistan','A connected picture of heat, from weather signals to workplace action.'],forecast:['24-HOUR ML FORECAST','The heat outlook.','Karachi · '+date(f.target_time_utc)+' PKT'],weather:['WEATHER EVIDENCE','The conditions.','Weather inputs from the latest stored Open-Meteo snapshot.'],temperature:['WEATHER SIGNAL','Air temperature','Stored weather input · not a personal exposure measurement.'],humidity:['WEATHER SIGNAL','Relative humidity','One of the key inputs behind the heat index.'],wind:['WEATHER SIGNAL','Wind speed','Wind measured at 10 metres, provided in metres per second.'],dew:['WEATHER SIGNAL','Dew point','The temperature at which air becomes saturated.'],heatindex:['HEAT FORECAST','More than temperature.','The modeled heat index combines weather signals.'],uncertainty:['MODEL UNCERTAINTY','A range, not a promise.','A historically calibrated interval around the 24-hour prediction.'],risk:['DERIVED RISK','Know the category.','Risk categories are derived from heat index, not worker illness outcomes.'],safety:['WORKER SAFETY','Turn insight into action.','Cited general guidance for people working in hot conditions.'],hydration:['WORKER SAFETY','Stay hydrated.','Official workplace heat guidance from CDC NIOSH.'],rest:['WORKER SAFETY','Rest. Recover.','Workplace guidance from CDC NIOSH and UK HSE.'],acclimatization:['WORKER SAFETY','Build up gradually.','Evidence-based guidance on getting used to hot work.'],evidence:['VERIFIED EVIDENCE','Every insight has a source.','Trace weather inputs, model evidence and official guidance.'],model:['MODEL EVALUATION','Measured performance.','HistGradientBoosting · held-out 2025 test set.'],warehouse:['DATA WAREHOUSE','A traceable foundation.','Read-only evidence from the project’s DuckDB gold views.'],quality:['QUALITY ASSURANCE','Trust, then verify.','The latest prediction must match a validated weather ingestion.'],sources:['OFFICIAL GUIDANCE','Grounded in evidence.','Three official sources in the project’s retrieval knowledge base.']};
-  const [tag,title,subtitle]=headings[id]||headings.forecast;
-  let html=`<span class="detail-tag">${escapeHTML(tag)}</span><h2 class="detail-title">${escapeHTML(title)}</h2><p class="detail-subtitle">${escapeHTML(subtitle)}</p>`;
-  if(['forecast','heatindex','risk','core'].includes(id)){
-    html+=`<div class="metric-hero"><div class="metric-label">PREDICTED HEAT INDEX</div><div class="metric-number">${fmt(f.model_prediction_c)}<small>°C</small></div><span class="risk-badge">◈ ${escapeHTML(f.model_risk_category)}</span><div class="risk-scale"><i></i><i></i><i></i><i></i><i></i></div><div class="scale-labels"><span>BELOW CAUTION</span><span>EXTREME DANGER</span></div></div>`;
-    html+=grid([[`${fmt(f.interval_lower_c)}–${fmt(f.interval_upper_c)}<small>°C</small>`,'Historical interval'],['24<small>hours</small>','Prediction horizon'],[fmt(d.metrics.test_model_mae_c,2)+'<small>°C</small>','Held-out test MAE'],['Karachi','Initial focus city']]);
-    html+=section('WHAT THIS MEANS','Heat-index categories help contextualize the forecast. Sunlight, exertion, protective equipment and individual conditions also affect workplace heat stress.');
-    html+=button('Explore the forecast','forecast')+source('gold.latest_live_ml');
-  }else if(['weather','temperature','humidity','wind','dew'].includes(id)){
-    const values={weather:[w.temperature_c,'°C'],temperature:[w.temperature_c,'°C'],humidity:[w.humidity_pct,'%'],wind:[w.wind_speed_ms,'m/s'],dew:[w.dew_point_c,'°C']};
-    const [value,unit]=values[id];html+=`<div class="metric-hero"><div class="metric-label">${id==='weather'?'AIR TEMPERATURE':'STORED INPUT'}</div><div class="metric-number">${fmt(value)}<small>${unit}</small></div><div class="metric-label">${date(w.time_utc)} PKT</div></div>`;
-    html+=grid([[fmt(w.temperature_c)+'<small>°C</small>','Air temperature'],[fmt(w.humidity_pct,0)+'<small>%</small>','Relative humidity'],[fmt(w.wind_speed_ms)+'<small>m/s</small>','Wind speed'],[fmt(w.dew_point_c)+'<small>°C</small>','Dew point']]);
-    html+=section('FROM WEATHER TO HEAT RISK','The model uses weather inputs and time-based features to predict the heat index 24 hours ahead. These values belong to the stored snapshot, not a live sensor.');html+=button('See hourly conditions','forecast')+source('gold.latest_live_weather');
-  }else if(id==='uncertainty'){
-    html+=`<div class="metric-hero"><div class="metric-label">HISTORICAL INTERVAL · °C</div><div class="metric-number" style="font-size:31px">${fmt(f.interval_lower_c)}–${fmt(f.interval_upper_c)}</div></div>`+section('HOW TO READ IT','The interval was calibrated on historical ERA5 data. Coverage with live forecast inputs has not yet been verified. It is not a guarantee of workplace safety.');
-    html+=grid([[fmt(d.metrics.interval_nominal_coverage*100,0)+'<small>%</small>','Nominal coverage'],[fmt(d.metrics.interval_empirical_coverage*100,1)+'<small>%</small>','Historical test coverage']])+button('Inspect model evidence','evidence')+source('gold.latest_live_ml');
-  }else if(['safety','hydration','rest','acclimatization'].includes(id)){
-    html+=section('CITED GUIDANCE','Explore the project’s existing retrieval assistant for source-backed workplace precautions. It retrieves official guidance and does not generate medical advice.');
-    [['Water & hydration','hydration'],['Rest breaks & shade','rest'],['Gradual acclimatization','acclimatization']].forEach(([label,key])=>html+=button(label,'ask-'+key));
-    html+=section('RESPONSIBLE USE','General precautions do not replace an on-site heat-risk assessment. Weather-derived heat index is not occupational WBGT.');
-    html+=`<div class="source-line">GUIDANCE SOURCES<br>CDC NIOSH · UK HSE · NOAA NWS</div>`;
-  }else{
-    html+=grid([[fmt(d.metrics.test_model_mae_c,2)+'<small>°C</small>','Model test MAE'],[fmt(d.metrics.test_model_r2,3),'Model test R²'],[Number(d.metrics.test_rows).toLocaleString(),'Held-out test rows'],['03','Official guidance sources']]);
-    html+=section('EVIDENCE STATUS',`${d.verified?'The stored forecast passed data quality checks and matches the latest ingestion.':'Forecast verification could not be confirmed.'} ${d.fresh?'The snapshot is within the three-hour freshness limit.':'The snapshot is older than the three-hour freshness limit.'}`);
-    if(id==='quality'||id==='warehouse')html+=section('SNAPSHOT ID',f.snapshot_id);
-    if(id==='model')html+=section('BASELINE COMPARISON',`Test MAE is ${fmt(d.metrics.test_model_mae_c,3)}°C, compared with ${fmt(d.metrics.test_baseline_mae_c,3)}°C for the same-hour previous-day baseline.`);
-    html+=button('Open the evidence library','evidence')+source(id==='model'?'modeling/evaluations/model_metrics':id==='sources'?'rag/source_registry.json':'gold.latest_live_ml');
-  }
-  $('#detail-content').innerHTML=html;
-  $$('[data-action]',$('#detail-content')).forEach(b=>b.addEventListener('click',()=>{const action=b.dataset.action;if(action.startsWith('ask-'))askTopic(action.slice(4));else showView(action);}));
-  if(open)$('#detail-panel').classList.remove('closed');
-}
-
-function showView(view){
-  state.view=view;$('#workspace').classList.toggle('focused-view',view!=='network');$$('.view-tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-  $('#content-view').hidden=view==='network';
-  if(view==='network')return;
-  $('#answer-panel').hidden=true;
-  if(!state.data)return;
-  const d=state.data,f=d.forecast;
-  const header=(label,title,subtitle)=>`<div class="view-heading"><div><span class="view-label">${label}</span><h2>${title}</h2><p>${subtitle}</p></div><button class="icon-button" id="close-view" aria-label="Back to network">×</button></div>`;
-  if(view==='forecast'){
-    $('#content-view').innerHTML=header('KARACHI · FORECAST EXPLORER','The next 24 hours.',`${date(f.issue_time_utc)} → ${date(f.target_time_utc)} PKT`) + `<div class="view-heading"><div class="forecast-summary"><strong>${fmt(temp(f.model_prediction_c))}<small>°${state.unit}</small></strong><p>24-hour ML prediction<br>${escapeHTML(f.model_risk_category)}</p></div><div class="unit-toggle" aria-label="Temperature unit"><button data-unit="C" class="${state.unit==='C'?'active':''}">°C</button><button data-unit="F" class="${state.unit==='F'?'active':''}">°F</button></div></div><div class="chart-container" id="forecast-chart"></div><div class="chart-tooltip" id="chart-tooltip">Hover over the chart to explore an hour.</div><div class="chart-legend"><span><i class="chart-key"></i>Formula heat index · weather inputs</span><span><i class="chart-key ml"></i>ML prediction · +24h</span></div><div class="view-footnote">The curve is the NWS heat-index formula applied to stored Open-Meteo forecast inputs. The gold point is the separate 24-hour ML prediction. These are different methods, not a continuous ML forecast.<br><br>Historical interval: ${fmt(temp(f.interval_lower_c))}–${fmt(temp(f.interval_upper_c))}°${state.unit}. ${d.mode==='snapshot'?'Saved project snapshot. ':''}${d.fresh?'':'Stored evidence is stale. '}Collected ${date(d.freshness.collected_at_utc)} PKT. Source: gold.latest_live_weather and gold.latest_live_ml.</div>`;
-    drawChart();$$('[data-unit]').forEach(b=>b.addEventListener('click',()=>{state.unit=b.dataset.unit;showView('forecast');}));
-  }else{
-    $('#content-view').innerHTML=header('TRACEABLE BY DESIGN','Behind the intelligence.','The datasets, evaluation and official guidance behind HeatSafe.')+`<div class="evidence-stats"><div><strong>${fmt(d.metrics.test_model_mae_c,2)}°C</strong><span>HEAT INDEX TEST MAE</span></div><div><strong>${fmt(d.metrics.test_model_r2,3)}</strong><span>HELD-OUT TEST R²</span></div><div><strong>${Number(d.metrics.test_rows).toLocaleString()}</strong><span>HELD-OUT TEST HOURS</span></div></div><div class="evidence-card"><h3>01 / Weather → warehouse</h3><p>ERA5 historical weather and Open-Meteo forecast inputs, validated and stored in DuckDB. The latest stored snapshot has ${d.freshness.total_hours} weather hours. Data attribution: Open-Meteo / ECMWF, CC BY 4.0.</p><p style="margin-top:9px">Snapshot: ${escapeHTML(f.snapshot_id)}<br>Quality: ${escapeHTML(f.dq_status)} · Matches latest ingestion: ${f.matches_latest_ingestion?'yes':'no'}</p></div><div class="evidence-card"><h3>02 / Model → evaluation</h3><p>HistGradientBoosting, compared with same-hour previous-day persistence. Model test MAE: ${fmt(d.metrics.test_model_mae_c,3)}°C. Baseline: ${fmt(d.metrics.test_baseline_mae_c,3)}°C. Risk-category accuracy: ${fmt(d.risk_metrics.accuracy*100,1)}%. Categories are derived from heat index, not measured health outcomes.</p></div>`+d.sources.map((s,i)=>`<div class="evidence-card"><h3>0${i+3} / ${escapeHTML(s.publisher)}</h3><p>${escapeHTML(s.title)}</p><a href="${escapeHTML(s.url)}" target="_blank" rel="noopener noreferrer">Read the official source ↗</a></div>`).join('')+`<div class="view-footnote">The assistant uses the project’s integrity-checked retrieval index. A generative AI layer is planned. Weather-derived heat index is not an on-site WBGT measurement. Data collected ${date(d.freshness.collected_at_utc)} PKT.</div>`;
-  }
-  $('#close-view').addEventListener('click',()=>showView('network'));
-}
-function drawChart(){
-  const d=state.data,rows=d.hourly;if(!rows?.length){$('#forecast-chart').textContent='No hourly evidence is available.';return;}
-  const W=580,H=215,L=36,R=17,T=17,B=35;const values=rows.map(r=>temp(r.heat_index_c));const ml=temp(d.forecast.model_prediction_c);
-  const min=Math.floor((Math.min(...values,ml)-2)/5)*5,max=Math.ceil((Math.max(...values,ml)+2)/5)*5;
-  const start=new Date(d.forecast.issue_time_utc).getTime();const end=new Date(d.forecast.target_time_utc).getTime();
-  const x=t=>L+(new Date(t).getTime()-start)/(end-start)*(W-L-R);const y=v=>H-B-(v-min)/(max-min)*(H-T-B);
-  const svg=svgEl('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'24 hours of formula heat-index values with a separate 24-hour ML prediction'},$('#forecast-chart'));
-  for(let value=min;value<=max;value+=5){svgEl('line',{x1:L,x2:W-R,y1:y(value),y2:y(value),class:'chart-grid'},svg);svgEl('text',{x:L-8,y:y(value)+3,'text-anchor':'end',class:'chart-label'},svg).textContent=value+'°';}
-  [0,6,12,18,24].forEach(h=>{const t=new Date(start+h*3600000);svgEl('text',{x:x(t),y:H-10,'text-anchor':h===24?'end':h===0?'start':'middle',class:'chart-label'},svg).textContent=hour(t);});
-  const line=rows.map((r,i)=>`${i?'L':'M'}${x(r.time_utc)},${y(values[i])}`).join(' ');
-  svgEl('path',{d:line+` L${x(rows.at(-1).time_utc)},${H-B} L${x(rows[0].time_utc)},${H-B} Z`,fill:'#9bd0aa',opacity:'.06'},svg);
-  svgEl('path',{d:line,fill:'none',stroke:'#a3d1b4','stroke-width':'2'},svg);
-  const guide=svgEl('line',{x1:L,x2:L,y1:T,y2:H-B,stroke:'#c2e0c2','stroke-dasharray':'3 4',opacity:'0'},svg);
-  rows.forEach((r,i)=>{const dot=svgEl('circle',{cx:x(r.time_utc),cy:y(values[i]),r:8,fill:'transparent',tabindex:'0',role:'img','aria-label':`${date(r.time_utc)} PKT: formula heat index ${fmt(values[i])} degrees ${state.unit}`},svg);const show=()=>{$('#chart-tooltip').textContent=`${date(r.time_utc)} PKT · Formula heat index ${fmt(values[i])}°${state.unit} · Humidity ${fmt(r.humidity_pct,0)}%`;guide.setAttribute('x1',x(r.time_utc));guide.setAttribute('x2',x(r.time_utc));guide.setAttribute('opacity','.5');};dot.addEventListener('mouseenter',show);dot.addEventListener('focus',show);dot.addEventListener('click',show);});
-  svgEl('circle',{cx:x(d.forecast.target_time_utc),cy:y(ml),r:9,fill:'#d9c28d',opacity:'.14'},svg);const mlDot=svgEl('circle',{cx:x(d.forecast.target_time_utc),cy:y(ml),r:4,fill:'#e5cd98',stroke:'#fff2c3','stroke-width':'.8',tabindex:'0',role:'img','aria-label':`24-hour ML prediction ${fmt(ml)} degrees ${state.unit}`},svg);const mlHover=()=>$('#chart-tooltip').textContent=`${date(d.forecast.target_time_utc)} PKT · 24-hour ML prediction ${fmt(ml)}°${state.unit}`;mlDot.addEventListener('mouseenter',mlHover);mlDot.addEventListener('focus',mlHover);
-}
-
-const topicQuestions={safety:'How can outdoor workers stay safe in the heat?',hydration:'How should workers hydrate in the heat?',rest:'How do rest breaks and shade help heat safety?',index:'What is heat index and how does humidity affect it?',acclimatization:'How should workers acclimatize to heat?'};
-function askTopic(topic){$('#question').value=topicQuestions[topic]||topicQuestions.safety;ask($('#question').value);}
-async function ask(question){
-  question=question.trim();if(!question)return;
-  const panel=$('#answer-panel'),body=$('#answer-content');panel.hidden=false;
-  body.innerHTML=`<div class="answer-question">${escapeHTML(question)}</div><div class="answer-text loading-pulse">Retrieving verified evidence…</div>`;
-  const submit=$('.send-button');submit.disabled=true;let answer,note;
-  try{
-    if(state.api){const response=await fetch('/api/insight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question}),signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw Error(result.error||'Assistant unavailable');answer=result.answer;note='Answered by the existing HeatSafe retrieval agent · official citations included where evidence is available.';}
-    else{
-      if(!state.guidance){const response=await fetch('guidance.json');if(!response.ok)throw Error('Saved guidance unavailable');state.guidance=await response.json();}
-      const q=question.toLowerCase();
-      if(/\b(aqi|pollution|hospital\w*|death\w*|injur\w*|admission\w*)\b/.test(q))answer="I don't know based on the available verified evidence. This information is not supported by the project's current verified gold data.";
-      else if(/\b(current|latest|today|tomorrow|forecast|prediction|predicted)\b/.test(q))answer='This hosted view contains saved project evidence, not a live forecast feed. Explore the forecast tab for the dated snapshot. Run the local website to query the DuckDB-connected agent and its freshness checks.';
-      else if(/\b(heat index|humidity|feels like)\b/.test(q))answer=state.guidance.index;
-      else if(/\b(acclimati[sz]\w*)\b/.test(q))answer=state.guidance.acclimatization;
-      else if(/\b(hydrat\w*|water|drink\w*)\b/.test(q))answer=state.guidance.hydration;
-      else if(/\b(rest|shade|breaks?)\b/.test(q))answer=state.guidance.rest;
-      else if(/\b(safe|safety|protect\w*|prevent\w*|precaution\w*|hot|heat)\b/.test(q))answer=state.guidance.safety;
-      else answer="I don't know based on the available verified evidence. In this saved project view, I can show the existing agent’s exported guidance on heat safety, hydration, rest, acclimatization and heat index.";
-      note='Saved response from the project’s retrieval agent, matched by topic. Local mode supports the full existing retrieval assistant. This is not a generative chat model.';
-    }
-    const safeAnswer=escapeHTML(answer).replace(/https:\/\/[^\s<]+/g,url=>`<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
-    body.innerHTML=`<div class="answer-question">${escapeHTML(question)}</div><div class="answer-text">${safeAnswer}</div><div class="answer-note">${escapeHTML(note)}</div><div class="suggestions"><button data-topic="hydration">Water & hydration</button><button data-topic="rest">Rest & shade</button><button data-topic="index">Explain heat index</button></div>`;
-    $$('[data-topic]',body).forEach(b=>b.addEventListener('click',()=>askTopic(b.dataset.topic)));
-  }catch(error){body.innerHTML=`<div class="answer-question">Unable to retrieve an answer</div><div class="answer-text">${escapeHTML(error.message)}. Please try again or explore the official sources in the Evidence tab.</div>`;}
-  finally{submit.disabled=false;}
-}
-
-function applyTransform(){state.zoom=Math.max(.55,Math.min(2,state.zoom));$('#map-transform').setAttribute('transform',`translate(${705+state.pan.x} ${398+state.pan.y}) scale(${state.zoom}) translate(-705 -398)`);$('#zoom-reset').textContent=Math.round(state.zoom*100)+'%';}
+function filterGraph(){$$('[data-group]',$('#network')).forEach(e=>e.style.opacity=!state.filter||e.dataset.group===state.filter||e.dataset.group==='location'?'1':'.13');$$('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===state.filter)));}
+function showNode(id){const n=state.data.network.nodes.find(n=>n.id===id);if(!n)return;state.selected=id;$$('.graph-node').forEach(e=>e.classList.toggle('selected',e.dataset.id===id));$('#detail-panel').hidden=false;$('#detail-content').innerHTML=`<span class="eyebrow">${escapeHTML(labels[n.group]||'KARACHI PULSE')}</span><h2>${escapeHTML(n.label)}</h2>${n.value!==null?`<div class="node-metric"><strong>${escapeHTML(nodeValue(n))}</strong></div>`:''}${badge(n.status)}<p>${escapeHTML(n.description||'Select a connected signal to explore its current value and source.')}</p><div class="node-source"><span class="eyebrow">VALUE TIME · PKT</span><p>${date(n.time_utc)}</p><span class="eyebrow">SOURCE</span><p>${escapeHTML(n.source||'HeatSafe Pakistan project')}</p></div><button class="card-link" id="node-open-view">Explore ${escapeHTML(n.view==='air'?'air quality':n.view==='forecast'?'forecast':n.view==='evidence'?'sources':'overview')} ↗</button>`;$('#node-open-view').addEventListener('click',()=>showView(n.view));}
+function applyTransform(){state.zoom=Math.max(.55,Math.min(2,state.zoom));$('#map-transform').setAttribute('transform',`translate(${705+state.pan.x} ${410+state.pan.y}) scale(${state.zoom}) translate(-705 -410)`);$('#zoom-reset').textContent=Math.round(state.zoom*100)+'%';}
 function resetMap(){state.zoom=1;state.pan={x:0,y:0};applyTransform();}
-function showInfo(kind){
-  const dialog=$('#info-dialog');
-  const content={
-    about:`<span class="dialog-label">HACKINSIGHT 2026 · CLIMATE & HEAT-HEALTH</span><h2>Heat intelligence.<br>Human impact.</h2><p>HeatSafe Pakistan combines weather evidence, a trained heat-index forecasting model, and official workplace guidance to help outdoor workers and decision-makers understand heat risk.</p><p>The initial focus is Karachi. This workspace connects the existing project’s DuckDB warehouse, HistGradientBoosting model evaluation and retrieval-based Insight Agent.</p><p>Heat index is not an on-site WBGT measurement. Informational estimates and general guidance support workplace assessment; they do not replace official alerts or medical advice.</p>`,
-    guide:`<span class="dialog-label">YOUR MAP GUIDE</span><h2>Follow the connections.</h2><ul><li>Select any glowing node to inspect its evidence.</li><li>Use the legend to focus on weather, forecasts, safety or sources. Select the same category again to show everything.</li><li>Drag the map to pan. Scroll or use + / − to zoom. The fit button resets your view.</li><li>Switch to Forecast to explore hourly formula values and the separate ML prediction.</li><li>Ask the Insight Agent about heat safety. Answers use official project guidance.</li></ul><p>Keyboard: Tab between nodes and controls, Enter to select, Escape to close panels. Use the pause button to stop ambient animation.</p>`,
-    workspace:`<span class="dialog-label">PROJECT WORKSPACE</span><h2>HeatSafe Pakistan</h2><p>Location: Karachi, Pakistan<br>Timezone: Asia/Karachi (PKT)<br>Forecast horizon: 24 hours<br>Model: HistGradientBoosting<br>Assistant: evidence retrieval, not generative AI</p><p>${state.api?(state.data?.storage?'The Python backend reads the read-only database bundled with this deployment. Updates require rebuilding and redeploying the package. Your computer can be switched off.':'Local mode reads the project’s DuckDB warehouse on refresh.'):'This static view uses a saved export of project evidence; the Python API is unavailable.'}</p><p>Evidence collected: ${state.data?date(state.data.freshness.collected_at_utc)+' PKT':'unavailable'}.</p>`
-  };
-  $('#dialog-content').innerHTML=content[kind];dialog.showModal();
-}
 
-$$('.view-tab').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-$$('.legend-item').forEach(b=>b.addEventListener('click',()=>{showView('network');state.filter=state.filter===b.dataset.filter?null:b.dataset.filter;updateFilter();if(state.filter)showDetail(state.filter);}));
-$('#close-detail').addEventListener('click',()=>$('#detail-panel').classList.add('closed'));
-$('#close-answer').addEventListener('click',()=>$('#answer-panel').hidden=true);
-$('#analysis-button').addEventListener('click',()=>showView('forecast'));
-$('#refresh-button').addEventListener('click',()=>loadData());
-$('#ask-form').addEventListener('submit',e=>{e.preventDefault();ask($('#question').value);});
-$('#zoom-in').addEventListener('click',()=>{state.zoom+=.15;applyTransform();});
-$('#zoom-out').addEventListener('click',()=>{state.zoom-=.15;applyTransform();});
-$('#zoom-reset').addEventListener('click',resetMap);$('#fit-map').addEventListener('click',resetMap);
-$('#network-layout').addEventListener('click',()=>{state.orbit=false;$('#network-layout').classList.add('active');$('#orbit-layout').classList.remove('active');buildNetwork();resetMap();});
-$('#orbit-layout').addEventListener('click',()=>{state.orbit=true;$('#network-layout').classList.remove('active');$('#orbit-layout').classList.add('active');buildNetwork();resetMap();});
-function setMotion(){document.body.classList.toggle('motion-paused',state.paused);$('#motion-toggle').textContent=state.paused?'▷':'Ⅱ';$('#motion-toggle').setAttribute('aria-pressed',state.paused);$('#motion-toggle').setAttribute('aria-label',state.paused?'Resume ambient animation':'Pause ambient animation');const svg=$('#network');if(state.paused)svg.pauseAnimations();else svg.unpauseAnimations();}
-$('#motion-toggle').addEventListener('click',()=>{state.paused=!state.paused;setMotion();});
-$('#about-button').addEventListener('click',()=>showInfo('about'));$('#settings-button').addEventListener('click',()=>showInfo('workspace'));$('#help-button').addEventListener('click',()=>showInfo('guide'));$('.dialog-close').addEventListener('click',()=>$('#info-dialog').close());$('#info-dialog').addEventListener('click',e=>{if(e.target===$('#info-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#answer-panel').hidden=true;$('#detail-panel').classList.add('closed');if(state.view!=='network')showView('network');}});
-const network=$('#network');let dragging=null;
-network.addEventListener('wheel',e=>{e.preventDefault();state.zoom+=e.deltaY>0?-.07:.07;applyTransform();},{passive:false});
-network.addEventListener('pointerdown',e=>{if(e.target.closest('.graph-node'))return;dragging={x:e.clientX,y:e.clientY,pan:{...state.pan}};network.setPointerCapture(e.pointerId);network.classList.add('dragging');});
-network.addEventListener('pointermove',e=>{if(!dragging)return;const ratio=1440/network.getBoundingClientRect().width;state.pan={x:dragging.pan.x+(e.clientX-dragging.x)*ratio,y:dragging.pan.y+(e.clientY-dragging.y)*ratio};applyTransform();});
-const stopDrag=()=>{dragging=null;network.classList.remove('dragging');};network.addEventListener('pointerup',stopDrag);network.addEventListener('pointercancel',stopDrag);
-setMotion();loadData(true);
+async function ask(question){question=question.trim();if(!question)return;$('#answer-panel').hidden=false;$('#answer-content').innerHTML=`<div class="answer-question">${escapeHTML(question)}</div><div class="answer-text">Retrieving evidence…</div>`;$('.send-button').disabled=true;try{let answer,note;if(state.api){const response=await fetch('/api/insight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question}),signal:AbortSignal.timeout(25000)}),result=await response.json();if(!response.ok)throw Error(result.error||'The assistant is unavailable.');answer=result.answer;note='Official heat-safety retrieval and explicitly sourced environmental data. No generative medical model.';}else{const q=question.toLowerCase();if(/aqi|air quality|pollution|pm2/.test(q)){const a=state.data.air_quality;answer=`Saved air-quality snapshot: US AQI ${fmt(a.current.us_aqi,0)}. ${a.current.aqi_category}.\nValid at ${date(a.valid_at_utc)} PKT.\nThis is saved data; the Python API is unavailable.\nSource: https://open-meteo.com/en/docs/air-quality-api`;}else{const response=await fetch('guidance.json');if(!response.ok)throw Error('Saved guidance unavailable.');const guidance=await response.json();answer=/humidity|heat index/.test(q)?guidance.index:/hydrat|water/.test(q)?guidance.hydration:/rest|shade/.test(q)?guidance.rest:/acclimat/.test(q)?guidance.acclimatization:/safe|heat|protect/.test(q)?guidance.safety:"I don't know based on the available verified evidence.";}note='Saved snapshot / saved topic guidance. The live Python assistant is unavailable.';}const safe=escapeHTML(answer).replace(/https:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);$('#answer-content').innerHTML=`<div class="answer-question">${escapeHTML(question)}</div><div class="answer-text">${safe}</div><div class="answer-note">${note}</div><div class="suggestions"><button data-ask="What is the current AQI?">Current AQI</button><button data-ask="What is heat index?">Explain heat index</button><button data-ask="How can outdoor workers stay safe in heat?">Worker safety</button></div>`;$$('[data-ask]').forEach(b=>b.addEventListener('click',()=>{$('#question').value=b.dataset.ask;ask(b.dataset.ask);}));}catch(e){$('#answer-content').innerHTML=`<div class="answer-question">Unable to retrieve an answer</div><p class="answer-text">${escapeHTML(e.message)}</p>`;}finally{$('.send-button').disabled=false;}}
+function chooseTheme(theme){if(!['forest','maroon','orange','brown','purple'].includes(theme))theme='forest';document.documentElement.dataset.theme=theme;try{localStorage.setItem('heatsafe-theme',theme);}catch{}$$('[data-theme-choice]').forEach(b=>b.classList.toggle('selected',b.dataset.themeChoice===theme));if(state.data)render();}
+function init(){
+ let theme='forest';try{theme=localStorage.getItem('heatsafe-theme')||theme;}catch{}chooseTheme(theme);
+ $$('.view-tab').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));$('#refresh-button').addEventListener('click',()=>loadData(true));$('#ask-form').addEventListener('submit',e=>{e.preventDefault();ask($('#question').value);});$('#close-answer').addEventListener('click',()=>$('#answer-panel').hidden=true);$('#close-detail').addEventListener('click',()=>$('#detail-panel').hidden=true);
+ $('#theme-button').addEventListener('click',()=>{const menu=$('#theme-menu');menu.hidden=!menu.hidden;$('#theme-button').setAttribute('aria-expanded',String(!menu.hidden));});$$('[data-theme-choice]').forEach(b=>b.addEventListener('click',()=>{chooseTheme(b.dataset.themeChoice);$('#theme-menu').hidden=true;$('#theme-button').setAttribute('aria-expanded','false');}));
+ $('#help-button').addEventListener('click',()=>$('#info-dialog').showModal());$('.dialog-close').addEventListener('click',()=>$('#info-dialog').close());
+ $('#zoom-in').addEventListener('click',()=>{state.zoom+=.15;applyTransform();});$('#zoom-out').addEventListener('click',()=>{state.zoom-=.15;applyTransform();});$('#zoom-reset').addEventListener('click',resetMap);$('#fit-map').addEventListener('click',resetMap);$('#network-layout').addEventListener('click',()=>{state.orbit=false;buildNetwork();});$('#orbit-layout').addEventListener('click',()=>{state.orbit=true;buildNetwork();});$('#motion-toggle').addEventListener('click',()=>{state.paused=!state.paused;document.body.classList.toggle('motion-paused',state.paused);$('#motion-toggle').setAttribute('aria-pressed',String(state.paused));$('#motion-toggle').textContent=state.paused?'▷':'Ⅱ';});document.body.classList.toggle('motion-paused',state.paused);
+ const network=$('#network');let drag=null;network.addEventListener('wheel',e=>{e.preventDefault();state.zoom+=e.deltaY>0?-.07:.07;applyTransform();},{passive:false});network.addEventListener('pointerdown',e=>{if(e.target.closest('.graph-node'))return;drag={x:e.clientX,y:e.clientY,pan:{...state.pan}};network.setPointerCapture(e.pointerId);network.classList.add('dragging');});network.addEventListener('pointermove',e=>{if(!drag)return;const ratio=1440/network.getBoundingClientRect().width;state.pan={x:drag.pan.x+(e.clientX-drag.x)*ratio,y:drag.pan.y+(e.clientY-drag.y)*ratio};applyTransform();});['pointerup','pointercancel'].forEach(name=>network.addEventListener(name,()=>{drag=null;network.classList.remove('dragging');}));
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#answer-panel').hidden=true;$('#theme-menu').hidden=true;$('#theme-button').setAttribute('aria-expanded','false');$('#detail-panel').hidden=true;}});
+ setInterval(()=>{if(!document.hidden)loadData();},300000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-(state.lastLoad||0)>300000)loadData();});loadData();
+}
+if(typeof document!=='undefined')init();
+else if(typeof module!=='undefined')module.exports={finite,fmt,nodeValue,weatherInfo,rowsForWindow,joinAir,segments,graphPositions,escapeHTML};

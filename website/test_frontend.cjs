@@ -1,0 +1,11 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const ui=require('./dist/app.js');
+test('missing values never become zero',()=>{assert.equal(ui.fmt(null),'—');assert.equal(ui.fmt(undefined),'—');assert.equal(ui.fmt(NaN),'—');assert.equal(ui.fmt(0),'0.0');});
+test('weather codes keep rain separate from snow and nights',()=>{assert.deepEqual(ui.weatherInfo(80),['☂','Rain']);assert.deepEqual(ui.weatherInfo(85),['❄','Snow showers']);assert.deepEqual(ui.weatherInfo(0,0),['☾','Clear night']);assert.equal(ui.weatherInfo(null)[1],'Conditions unavailable');});
+test('time range uses actual timestamps, not array length',()=>{const rows=[0,12,24,36,48].map(h=>({time_utc:new Date(h*3600000).toISOString()}));assert.equal(ui.rowsForWindow(rows,24).length,3);assert.equal(ui.rowsForWindow(rows,48).length,5);});
+test('weather table only joins air data at matching hours',()=>{const rows=ui.joinAir([{time_utc:'2026-10-21T00:00:00Z'},{time_utc:'2026-10-21T01:00:00Z'}],[{time_utc:'2026-10-21T01:00:00+00:00',us_aqi:115}]);assert.equal(rows[0].air,null);assert.equal(rows[1].air.us_aqi,115);});
+test('charts break at missing values instead of drawing fabricated zeros',()=>{const rows=[1,null,3,NaN,0].map((v,i)=>({time_utc:new Date(i*3600000).toISOString(),v}));const parts=ui.segments(rows,'v');assert.equal(parts.length,3);assert.deepEqual(parts.map(p=>p[0][1]),[1,3,0]);});
+test('graph layout follows nodes supplied by API',()=>{const graph={nodes:[{id:'karachi'},{id:'weather',parent:'karachi'},{id:'temperature',parent:'weather',value:36}]};const a=ui.graphPositions(graph);assert.equal(a.length,3);assert.equal(a[2].value,36);assert.ok(Number.isFinite(a[2].x));graph.nodes.push({id:'new',parent:'weather',value:7});assert.equal(ui.graphPositions(graph).length,4);});
+test('untrusted values are escaped before HTML rendering',()=>{assert.equal(ui.escapeHTML('<img src=x onerror="x">'),'&lt;img src=x onerror=&quot;x&quot;&gt;');});
+test('model error remains a temperature difference in its declared Celsius unit',()=>{assert.equal(ui.nodeValue({id:'mae',value:1.05595,unit:'°C'}),'1.06 °C');});

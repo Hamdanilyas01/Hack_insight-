@@ -1,6 +1,6 @@
 # Upload this whole folder to Vercel
 
-This is the complete HeatSafe deployment: frontend + Python API + original retrieval assistant + a read-only DuckDB snapshot.
+This is the complete Karachi Pulse deployment: frontend + Python API + live modeled weather/AQI + cited safety retrieval + a read-only DuckDB archive.
 
 1. Open https://vercel.com/drop and sign in.
 2. Drag the entire `vercel-upload` folder into the upload area, or upload `heatsafe-vercel.zip`.
@@ -8,6 +8,7 @@ This is the complete HeatSafe deployment: frontend + Python API + original retri
 4. Wait for the deployment to finish and open its URL.
 5. Open `/api/health` on the same URL. `status: "ok"`, `storage.location: "vercel"` and `retrieval.status: "ready"` confirm the actual backend, bundled database, and retrieval index are running.
 6. Ask "What is heat index and how does humidity affect it?". The response should contain the NOAA source citation.
+7. Open Air quality and ask "What is the current AQI?". Values come from the public CAMS / Open-Meteo API, with source timestamps and a clear fallback if unavailable.
 
 No API key or database password is required. No GitHub repository or local server is required after deployment.
 
@@ -16,6 +17,21 @@ No API key or database password is required. No GitHub repository or local serve
 The file `warehouse/heatsafe_live.duckdb` is bundled inside the Python function deployment, outside `public/`. DuckDB runs in the Vercel Python process and opens this file in read-only mode. It is not a separate hosted database service, and it is not your computer's live database. The database file cannot be downloaded through this app's public routes.
 
 The packaged database is fixed at upload time. The app does not run Prefect ingestion, retrain the model, write new forecasts, or update this database in the cloud. Existing freshness checks remain in place: stale forecasts are labeled, and the agent refuses to call them current. General source-backed guidance continues to work when forecast data is stale.
+
+## What updates automatically
+
+- While open and visible, the website polls `/api/dashboard` every five minutes.
+- The Python API requests Karachi weather and CAMS air-quality forecasts from Open-Meteo. Successful results are cached for 15 minutes per running Python instance. A failed source is retried on a subsequent request after a 60-second backoff. Different instances and cold starts have separate caches.
+- These requests are triggered by website traffic, not a cloud cron. With no requests, no source refresh occurs. Provider model runs have their own update schedules; requesting every 15 minutes does not imply new model data every 15 minutes.
+- The displayed top-right timestamp is the last successful source pull, not the time the page rendered. Sources & updates lists weather/AQI pull times, their model valid times, and the last backend response separately.
+- The sources are model estimates, not on-site sensors. The live hourly heat-index curve uses the NWS formula with API weather inputs. The saved 24-hour ML prediction is kept in a separate, dated card.
+- DuckDB remains read-only and its historical records/ML forecast do not change. Its CAMS pollutant history is displayed as monthly concentrations, not invented historical AQI.
+
+## Interface
+
+Karachi Pulse groups temperature, heat index, US AQI, humidity and wind KPIs in one navbar panel. Overview, Forecast and Air quality provide line/area charts, 24/48-hour controls, Celsius/Fahrenheit units, daily weather icons and minimal hourly tables. The Network view renders the nodes and links returned by the backend; missing metric fields are omitted and category counts follow the payload.
+
+Theme choices: Forest, beige/maroon, white/orange/black, brown/beige, and white/purple/blue. The selected theme persists in browser local storage.
 
 ## Updating data or code
 

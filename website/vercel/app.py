@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 
-from backend.server import get_agent, read_dashboard
+from backend.server import get_agent, read_dashboard, answer_insight
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / 'public'
@@ -29,6 +29,7 @@ def storage_info():
         'access': 'read-only',
         'data_updates': 'Rebuild the upload package and redeploy to replace the database snapshot.',
         'automatic_ingestion': False,
+        'environmental_api': 'Request-driven weather and CAMS AQI; 15-minute per-instance cache.',
     }
 
 
@@ -40,7 +41,7 @@ def response(body, status=200):
 def health():
     """Verify the real database and knowledge index; never silently use JSON fallback."""
     try:
-        data = read_dashboard()
+        data = read_dashboard(live=False)
         with agent_lock:
             chunks = len(get_agent().chunks)
         return response({
@@ -48,6 +49,8 @@ def health():
             'forecast_collected_at': data['freshness']['collected_at_utc'],
             'forecast_fresh': data['fresh'], 'forecast_verified': data['verified'],
             'retrieval': {'status': 'ready', 'knowledge_chunks': chunks, 'generative_model': False},
+            'updates': {'mode':'request-driven', 'browser_poll_seconds':300, 'source_cache_seconds':900,
+                        'scheduled_prefect':False, 'database_writable':False},
         })
     except Exception:
         logger.exception('Health check failed')
@@ -57,7 +60,7 @@ def health():
 @app.get('/api/dashboard')
 def dashboard():
     try:
-        data = read_dashboard()
+        data = read_dashboard(live=True)
         data['storage'] = storage_info()
         return response(data)
     except Exception:
@@ -102,7 +105,7 @@ async def insight(request: Request):
 
 def answer_question(question):
     with agent_lock:
-        return get_agent().answer(question)
+        return answer_insight(question)
 
 
 @app.get('/', include_in_schema=False)

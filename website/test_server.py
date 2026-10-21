@@ -71,7 +71,7 @@ class APITests(unittest.TestCase):
         self.assertIn('unavailable', json.loads(body)['error'])
 
     def test_unsupported_agent_question(self):
-        code, body = self.request('POST', '/api/insight', json.dumps({'question':'What is the current AQI?'}))
+        code, body = self.request('POST', '/api/insight', json.dumps({'question':'How many hospital admissions were there?'}))
         self.assertEqual(code, 200)
         self.assertIn("I don't know", json.loads(body)['answer'])
 

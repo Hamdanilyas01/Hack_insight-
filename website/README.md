@@ -1,6 +1,6 @@
 # HeatSafe Pakistan website
 
-The reference-video-inspired interface is an interactive evidence network with animated nodes, category filters, draggable/zoomable views, a forecast explorer, model evaluation, and the existing cited Insight Agent.
+Karachi Pulse extends the reference-video-inspired evidence network with live modeled weather/AQI, line and area charts, hourly tables, daily weather icons, a single named KPI panel, and five persistent color themes. Network nodes/links/values are provided by the backend and rebuilt from each payload.
 
 Private hosted snapshot: https://heatsafe-pakistan-observatory.goodsugar.chatgpt.site (ChatGPT sign-in required). The hosted version contains the saved evidence export; run locally for the warehouse and original agent integration.
 
@@ -14,7 +14,15 @@ python website/server.py
 
 Open http://127.0.0.1:8000. Change the port with `--port 8080`.
 
-The local API reads `warehouse/heatsafe_live.duckdb` without modifying it. `/api/dashboard` returns the gold forecast and weather evidence. `/api/insight` calls `rag.insight_agent.HeatSafeInsightAgent`, retaining its source-integrity and freshness checks. No model retraining or pipeline execution is triggered by the website.
+The local API reads `warehouse/heatsafe_live.duckdb` without modifying it. `/api/dashboard` combines the archived gold ML result, historical CAMS pollutant data, and live Open-Meteo weather/AQI responses. `/api/insight` extends `rag.insight_agent.HeatSafeInsightAgent` with cited environmental API answers while retaining the original safety retrieval and ML freshness checks. No model retraining or Prefect pipeline execution is triggered by the website.
+
+## Refresh behavior and data meaning
+
+The visible page polls every five minutes. The backend caches successful upstream requests for 15 minutes per Python instance; failed sources use a 60-second retry backoff. Cold starts can fetch sooner. This is request-driven: no page/API traffic means no background updates. Vercel does not run the original `pipelines/serve_hourly.py` Prefect worker.
+
+Weather and air-quality values are modeled estimates, not on-site sensor measurements. Top-right **Last source pull** reports a successful upstream fetch time. **Sources & updates** shows each feed's pull time, model valid time, backend response time, and the archived ML collection time separately. Missing/null values display as unavailable, never zero. Failed requests can show explicitly stale cache data or clearly dated archive data.
+
+US AQI is requested directly from Open-Meteo's CAMS feed. The existing cleaned.cams_air_quality table supplies a separate historical monthly pollutant concentration chart. It is not converted to a fabricated current AQI. Live heat-index forecast lines are formula-based; the project's single +24-hour ML prediction remains a separate stored result.
 
 The original `.venv` points to a Python installation on the previous developer’s machine. Use your working Python installation or recreate the environment. For this machine, DuckDB was installed in the ignored `.web-deps/` folder; the website adds that directory to its Python path. Other agent dependencies (NumPy, pandas, scikit-learn) use the active Python environment. A minimal dependency list is in `requirements.txt` in this directory.
 
@@ -30,7 +38,7 @@ Upload **the whole `E:\heatsafe\vercel-upload` folder** or **`E:\heatsafe\heatsa
 
 After deployment, `/api/health` checks the real database and knowledge index. Look for `status: "ok"`, `storage.location: "vercel"`, and `retrieval.status: "ready"`. The assistant now runs in the Python backend, rather than returning the static site's five saved topic responses.
 
-**Database location:** `warehouse/heatsafe_live.duckdb` is private deployment data inside the Vercel Python function bundle. DuckDB runs within that process and opens it read-only. It is not a separate cloud database service and does not reach back to your computer. Forecasts and historical data remain at their packaging snapshot. Refresh rereads that copy; updates require rebuilding and redeploying. No cloud Prefect ingestion or model execution is added by this packaging change.
+**Database location:** `warehouse/heatsafe_live.duckdb` is private deployment data inside the Vercel Python function bundle. DuckDB runs within that process and opens it read-only. It does not reach back to your computer. Historical records and the stored ML result remain at their packaging snapshot; database updates require rebuilding and redeploying. Weather/AQI API requests happen separately and do not write to this file. No cloud Prefect worker or model execution is enabled.
 
 The bundle does not include your virtual environment, original Git metadata, credentials, training datasets, or model binary. The trained model's existing forecast is read from DuckDB; no training dependencies beyond the retrieval agent's numerical libraries are needed. Detailed upload instructions are included in `vercel-upload/README.md`.
 
@@ -62,13 +70,16 @@ The formula-based hourly heat-index curve and the separate +24-hour ML point are
 - `dist/style.css`: responsive layout, theme and reduced-motion support
 - `dist/app.js`: evidence graph, panels, chart and assistant interactions
 - `server.py`: read-only local API, static server and snapshot exporter
+- `environment_data.py`: source validation, per-instance upstream cache, historical air queries and data-driven network schema
+- `vercel/`: deployable FastAPI entrypoint, runtime requirements and instructions
 - `test_server.py`: meaningful checks for evidence integrity, API behavior and safety boundaries
 
 ## Verification
 
 ```powershell
 node --check website/dist/app.js
-python -m unittest discover -s website -p test_server.py
+python -m unittest discover -s website -p 'test_*.py'
+node --test website/test_frontend.cjs
 ```
 
 No JavaScript dependency install or build step is required.

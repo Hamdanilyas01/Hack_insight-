@@ -40,6 +40,7 @@ def main():
         'website/vercel/vercel.json': 'vercel.json',
         'website/vercel/README.md': 'README.md',
         'website/server.py': 'backend/server.py',
+        'website/environment_data.py': 'backend/environment_data.py',
         'rag/insight_agent.py': 'rag/insight_agent.py',
         'rag/knowledge_chunks.jsonl': 'rag/knowledge_chunks.jsonl',
         'rag/knowledge_manifest.json': 'rag/knowledge_manifest.json',
@@ -73,7 +74,7 @@ def main():
         # acquire a writer lock and change the source file mid-copy.
         connection = duckdb.connect(str(database), read_only=True)
         try:
-            dashboard = server.read_dashboard()
+            dashboard = server.read_dashboard(live=True)
             shutil.copy2(database, staging / 'warehouse/heatsafe_live.duckdb')
         finally:
             connection.close()

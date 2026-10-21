@@ -1,65 +1,21 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#071313">
-  <meta name="description" content="Explore the connections behind Karachi's heat risk. Weather evidence, a 24-hour ML forecast, and cited workplace guidance from HeatSafe Pakistan.">
-  <title>HeatSafe Pakistan — Heat Intelligence</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
-  <script src="app.js" defer></script>
-</head>
+<html lang="en" data-theme="forest"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1716"><meta name="description" content="Karachi Pulse: weather, air quality, heat forecasts and cited safety guidance from HeatSafe Pakistan."><title>HeatSafe Pakistan · Karachi Pulse</title><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="./" aria-label="HeatSafe home"><span class="brand-mark">✳</span><span>HeatSafe<span class="brand-country">PAKISTAN</span></span><span class="brand-divider"></span><span class="brand-caption">Heat intelligence<br>for a safer tomorrow.</span></a>
-      <nav class="view-tabs" aria-label="Workspace views">
-        <button class="view-tab active" data-view="network"><span>⌘</span> Intelligence map</button>
-        <button class="view-tab" data-view="forecast"><span>⌁</span> Forecast</button>
-        <button class="view-tab" data-view="evidence"><span>▧</span> Evidence</button>
-      </nav>
-      <div class="header-actions"><span class="project-tag">HACKINSIGHT ’26</span><button class="icon-button" id="about-button" aria-label="About HeatSafe">i</button><button class="avatar" id="settings-button" aria-label="Open workspace information">HS</button></div>
-    </header>
-
-    <main id="workspace">
-      <section class="intro" aria-label="Workspace overview"><div class="eyebrow"><span class="tiny-star">✳</span> THE HEAT INTELLIGENCE WORKSPACE</div><h1>See the risk.<br><span>Connect the evidence.</span></h1><p>One connected view of Karachi’s heat.<br>Built for the people who work through it.</p><div class="location-pill"><span class="location-dot"></span> Karachi, Pakistan <span class="muted">24.86° N · 67.01° E</span></div></section>
-
-      <div class="graph-toolbar" role="group" aria-label="Map controls"><button class="icon-button active" id="network-layout" aria-label="Radial network layout" title="Radial network">⌘</button><button class="icon-button" id="orbit-layout" aria-label="Orbit layout" title="Orbit layout">◎</button><span></span><button class="icon-button" id="zoom-out" aria-label="Zoom out">−</button><button class="zoom-readout" id="zoom-reset" aria-label="Reset map zoom">100%</button><button class="icon-button" id="zoom-in" aria-label="Zoom in">+</button><span></span><button class="icon-button" id="fit-map" aria-label="Fit map to view" title="Fit map">⛶</button><button class="icon-button" id="motion-toggle" aria-label="Pause ambient animation" aria-pressed="false" title="Pause animation">Ⅱ</button></div>
-
-      <section class="network-stage" id="network-stage" aria-label="Interactive heat intelligence network">
-        <svg id="network" viewBox="0 0 1440 900" role="group" aria-label="HeatSafe evidence network. Select a node to explore its evidence.">
-          <defs>
-            <radialGradient id="core-fill"><stop stop-color="#fff4c8"/><stop offset=".38" stop-color="#d5bd82"/><stop offset=".72" stop-color="#8a835a"/><stop offset="1" stop-color="#223f36"/></radialGradient>
-            <radialGradient id="mint-fill" cx="35%" cy="28%"><stop stop-color="#d3fff1"/><stop offset=".3" stop-color="#77c8ab"/><stop offset=".7" stop-color="#2b695c"/><stop offset="1" stop-color="#102c2a"/></radialGradient>
-            <radialGradient id="amber-fill" cx="35%" cy="28%"><stop stop-color="#fff1cb"/><stop offset=".3" stop-color="#e1bd79"/><stop offset=".7" stop-color="#97764d"/><stop offset="1" stop-color="#3d382c"/></radialGradient>
-            <radialGradient id="violet-fill" cx="35%" cy="28%"><stop stop-color="#e4daff"/><stop offset=".3" stop-color="#b49ad9"/><stop offset=".7" stop-color="#6a548f"/><stop offset="1" stop-color="#28213e"/></radialGradient>
-            <radialGradient id="rose-fill" cx="35%" cy="28%"><stop stop-color="#ffe4e2"/><stop offset=".3" stop-color="#d99da2"/><stop offset=".7" stop-color="#925a68"/><stop offset="1" stop-color="#3f2530"/></radialGradient>
-            <filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="5"/></filter>
-            <filter id="core-glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="13"/></filter>
-            <linearGradient id="edge-gradient"><stop stop-color="#9dc9b0" stop-opacity=".08"/><stop offset=".5" stop-color="#b9d8bf" stop-opacity=".55"/><stop offset="1" stop-color="#9dc9b0" stop-opacity=".16"/></linearGradient>
-          </defs>
-          <g id="map-transform"><g id="edges"></g><g id="particles"></g><g id="nodes"></g></g>
-        </svg>
-        <div class="map-coordinate coord-top">24.8607° N<br>67.0011° E</div><div class="map-coordinate coord-bottom">KARACHI HEAT NETWORK<br><span>WEATHER → INTELLIGENCE → ACTION</span></div>
-      </section>
-
-      <div class="data-status"><span class="status-dot"></span><span id="data-mode">Loading project evidence</span><span class="status-divider">/</span><span id="updated-label">Connecting…</span><button id="refresh-button" aria-label="Refresh evidence" title="Refresh evidence">↻</button></div>
-
-      <aside class="legend glass" aria-label="Filter network"><div class="panel-label">EXPLORE CONNECTIONS <span>↗</span></div><button class="legend-item" data-filter="weather" aria-pressed="false"><i class="legend-dot mint"></i>Weather signals <span>05</span></button><button class="legend-item" data-filter="forecast" aria-pressed="false"><i class="legend-dot amber"></i>Heat forecast <span>04</span></button><button class="legend-item" data-filter="safety" aria-pressed="false"><i class="legend-dot rose"></i>Worker safety <span>04</span></button><button class="legend-item" data-filter="evidence" aria-pressed="false"><i class="legend-dot violet"></i>Verified evidence <span>05</span></button><div class="legend-hint">Select a node. Follow the connection.</div></aside>
-
-      <aside class="detail-panel glass" id="detail-panel" aria-label="Selected node details">
-        <div class="panel-topline"><span class="panel-label"><span class="tiny-star">✳</span> NODE INSIGHT</span><button class="icon-button" id="close-detail" aria-label="Close node details">×</button></div>
-        <div id="detail-content"></div>
-      </aside>
-
-      <section class="agent-dock glass" aria-label="HeatSafe insight assistant"><div class="dock-stats"><div><span>24H HEAT INDEX</span><strong id="dock-heat">—<small>°C</small></strong></div><div><span>RISK CATEGORY</span><strong class="risk-text" id="dock-risk">—</strong></div><div><span>MODEL TEST MAE</span><strong id="dock-mae">—<small>°C</small></strong></div><div><span>GUIDANCE SOURCES</span><strong>03<small>verified</small></strong></div></div><form id="ask-form"><label class="sr-only" for="question">Ask HeatSafe a question</label><span class="input-spark">✳</span><input id="question" type="text" maxlength="1000" autocomplete="off" placeholder="Ask how to stay safe in the heat…"><button type="submit" class="send-button" aria-label="Ask insight agent">↗</button></form><div class="dock-footer"><span><i class="status-dot"></i> Insight agent <span class="muted">· Evidence retrieval</span></span><button id="analysis-button">✧ Explore forecast <span>↗</span></button></div></section>
-
-      <section id="content-view" class="content-view glass" hidden aria-label="Workspace detail view"></section>
-      <section class="answer-panel glass" id="answer-panel" hidden aria-label="Insight agent answer" aria-live="polite"><div class="panel-topline"><span class="panel-label">✧ HEATSAFE INSIGHT</span><button class="icon-button" id="close-answer" aria-label="Close assistant answer">×</button></div><div id="answer-content"></div></section>
-      <div class="workspace-footer"><span class="status-dot"></span> DESIGNED AROUND PEOPLE. GROUNDED IN EVIDENCE.<button id="help-button">? <span>Map guide</span></button></div>
-    </main>
-  </div>
-  <dialog id="info-dialog" class="glass"><button class="dialog-close icon-button" aria-label="Close dialog">×</button><div id="dialog-content"></div></dialog>
-  <div class="toast" id="toast" role="status"></div>
-</body>
-</html>
+<header class="topbar">
+ <a class="brand" href="./" aria-label="HeatSafe home"><span class="brand-mark">✳</span><span>HeatSafe<small>PAKISTAN</small></span></a>
+ <nav class="view-tabs" aria-label="Workspace views"><button class="view-tab active" data-view="overview"><span>◫</span> Overview</button><button class="view-tab" data-view="forecast"><span>⌁</span> Forecast</button><button class="view-tab" data-view="air"><span>≋</span> Air quality</button><button class="view-tab" data-view="network"><span>⌘</span> Network</button><button class="view-tab" data-view="evidence"><span>▧</span> Sources & updates</button></nav>
+ <div class="header-right"><div class="last-pull"><span><i id="connection-dot" class="status-dot"></i><b id="connection-label">Connecting</b></span><span id="last-pull">Last source pull: —</span></div><button id="refresh-button" class="icon-button" aria-label="Refresh dashboard">↻</button><button id="theme-button" class="icon-button" aria-label="Choose color theme" aria-expanded="false">◐</button></div>
+ <section id="theme-menu" class="theme-menu panel" hidden aria-label="Color theme choices"><span class="eyebrow">MAKE IT YOURS</span><h2>Color theme</h2><button data-theme-choice="forest"><i style="background:#16372d"></i>Forest · original</button><button data-theme-choice="maroon"><i style="background:#842b45"></i>Beige / maroon</button><button data-theme-choice="orange"><i style="background:#e16b2a"></i>White / orange / black</button><button data-theme-choice="brown"><i style="background:#795439"></i>Brown / beige</button><button data-theme-choice="purple"><i style="background:#7257b9"></i>White / purple / blue</button></section>
+</header>
+<section class="pulse-panel" aria-label="Karachi Pulse key indicators"><div class="pulse-name"><span class="eyebrow">YOUR CITY AT A GLANCE</span><h1>Karachi Pulse<span>↗</span></h1><p>Karachi, Pakistan <span>· PKT</span></p></div><div id="pulse-kpis" class="pulse-kpis" aria-live="polite"><p class="muted">Loading verified values…</p></div></section>
+<main id="workspace"><section id="content-view" aria-label="Dashboard content"><div class="loading-state"><span class="brand-mark">✳</span><h2>Connecting the evidence…</h2><p>Checking weather, air quality and your project’s stored forecast.</p></div></section>
+ <section id="network-view" hidden aria-label="Interactive data network"><div class="network-intro"><span class="eyebrow">FOLLOW THE CONNECTIONS</span><h2>Your city.<br><span>Every signal connected.</span></h2><p>Each node comes from the API response.<br>Select one to see its value, time and source.</p></div>
+ <div class="graph-toolbar" role="group" aria-label="Map controls"><button class="icon-button active" id="network-layout" aria-label="Radial layout">⌘</button><button class="icon-button" id="orbit-layout" aria-label="Orbit layout">◎</button><span></span><button class="icon-button" id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-reset" aria-label="Reset map zoom">100%</button><button class="icon-button" id="zoom-in" aria-label="Zoom in">+</button><button class="icon-button" id="fit-map" aria-label="Fit map to view">⛶</button><button class="icon-button" id="motion-toggle" aria-label="Pause animation" aria-pressed="false">Ⅱ</button></div>
+ <svg id="network" viewBox="0 0 1440 850" role="group" aria-label="Karachi data network"><defs><filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter></defs><g id="map-transform"><g id="edges"></g><g id="nodes"></g></g></svg>
+ <aside id="legend" class="legend panel" aria-label="Filter network"></aside><aside id="detail-panel" class="detail-panel panel" hidden aria-label="Selected node details"><div class="panel-topline"><span class="eyebrow">THE SIGNAL, EXPLAINED</span><button class="icon-button" id="close-detail" aria-label="Close node details">×</button></div><div id="detail-content"></div></aside></section>
+</main>
+<section class="agent-dock panel" aria-label="HeatSafe insight assistant"><span class="agent-icon">✧</span><form id="ask-form"><label class="sr-only" for="question">Ask HeatSafe a question</label><input id="question" maxlength="1000" placeholder="Ask about heat safety, humidity or current AQI…" autocomplete="off"><button class="send-button" type="submit" aria-label="Ask insight agent">↗</button></form><span class="agent-caption">Source-backed<br><b>Insight assistant</b></span></section>
+<section id="answer-panel" class="answer-panel panel" hidden aria-label="Assistant answer" aria-live="polite"><div class="panel-topline"><span class="eyebrow">✧ HEATSAFE INSIGHT</span><button class="icon-button" id="close-answer" aria-label="Close assistant answer">×</button></div><div id="answer-content"></div></section>
+<footer class="workspace-footer"><span><i class="status-dot"></i> DATA WITH CONTEXT. DECISIONS WITH CONFIDENCE.</span><button id="help-button">How this works ↗</button></footer>
+<dialog id="info-dialog" class="panel"><button class="icon-button dialog-close" aria-label="Close dialog">×</button><span class="eyebrow">A CLEARER PICTURE</span><h2>Know what you’re seeing.</h2><p>Weather and air quality are model estimates from Open-Meteo and CAMS, not direct readings from on-site sensors.</p><p>The page checks the backend every five minutes while open. Each Python instance caches upstream requests for 15 minutes. Cold starts can fetch sooner. No requests means no background refresh.</p><p>DuckDB is read-only. The original hourly Prefect job is not running on Vercel. Its stored ML prediction changes only when the warehouse is updated and redeployed.</p><p>Network values, available nodes and source labels come from the backend payload. Heat index is not an on-site WBGT measurement.</p></dialog><div id="toast" class="toast" role="status"></div>
+</body></html>

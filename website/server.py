@@ -8,6 +8,12 @@ import json
 from pathlib import Path
 import sys
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
+
+if __package__:
+    from .environment_data import enrich, read_air_history
+else:
+    from environment_data import enrich, read_air_history
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = Path(__file__).resolve().parent / 'dist'
@@ -18,6 +24,10 @@ def json_default(value):
     if isinstance(value, datetime):
         return value.isoformat()
     raise TypeError(type(value).__name__)
+
+
+def display_time_pk(value):
+    return value.astimezone(ZoneInfo('Asia/Karachi')).strftime('%d %b %Y, %I:%M %p PKT') if value else 'unavailable'
 
 def heat_index(t, rh):
     f = t * 1.8 + 32
@@ -33,7 +43,7 @@ def heat_index(t, rh):
         hi += ((rh-85)/10)*((87-f)/5)
     return (hi-32)/1.8
 
-def read_dashboard():
+def read_dashboard(live=False):
     import duckdb
     connection = duckdb.connect(str(ROOT / 'warehouse/heatsafe_live.duckdb'), read_only=True)
     def query(sql):
@@ -47,6 +57,7 @@ def read_dashboard():
         forecast = forecast[0]
         freshness = query('SELECT * FROM gold.live_freshness')[0]
         weather = query('SELECT * FROM gold.latest_live_weather ORDER BY time_utc')
+        historical_air = read_air_history(connection)
     finally:
         connection.close()
     collected = freshness['collected_at_utc']
@@ -56,7 +67,7 @@ def read_dashboard():
         row['heat_index_c'] = round(heat_index(row['temperature_c'], row['humidity_pct']), 2)
     current = min(weather, key=lambda row: abs((row['time_utc'] - collected).total_seconds()))
     hours = [row for row in weather if row['time_utc'] >= forecast['issue_time_utc']][:25]
-    return {
+    dashboard = {
         'mode': 'warehouse', 'exported_at': datetime.now(timezone.utc),
         'fresh': valid and 0 <= age <= 10800, 'verified': valid,
         'forecast': forecast, 'freshness': freshness, 'current': current, 'hourly': hours,
@@ -64,15 +75,63 @@ def read_dashboard():
         'risk_metrics': json.loads((ROOT / 'modeling/evaluations/risk_metrics_20261020T092105Z.json').read_text()),
         'sources': json.loads((ROOT / 'rag/source_registry.json').read_text())['sources'],
     }
+    return enrich(dashboard, historical_air, heat_index, live=live)
 
 @lru_cache(maxsize=1)
 def get_agent():
     from rag.insight_agent import HeatSafeInsightAgent
     return HeatSafeInsightAgent()
 
+
+def answer_insight(question):
+    """Extend the existing cited safety agent with clearly sourced environmental data."""
+    import re
+    q = question.casefold()
+    if re.search(r'\b(?:death\w*|hospital\w*|admission\w*|injur\w*|patient\w*)\b', q):
+        return get_agent().answer(question)
+    if re.search(r'\b(?:pipeline|prefect|update frequency)\b', q) or 'how often' in q and 'update' in q:
+        return ('The original Prefect pipeline is not running on Vercel. The open website checks its API every 5 minutes. '
+                'Each Python instance caches weather and AQI source responses for 15 minutes; cold starts can fetch sooner. '
+                'No requests means no background refresh. DuckDB is read-only and its stored ML result only changes when '
+                'you rebuild and redeploy an updated database. This is request-driven API access, not scheduled ML inference.')
+    if re.search(r'\b(?:aqi|air quality|pm2[._]?5|pm10|pollution|ozone|nitrogen dioxide)\b', q):
+        air = read_dashboard(live=True)['air_quality']
+        current = air['current']
+        if current.get('us_aqi') is None:
+            return ('Current AQI is unavailable from the live source. The project contains historical pollutant concentrations, '
+                    'which must not be presented as today’s AQI. Explore Air quality to see the dated history.\n\n'
+                    'Source: https://open-meteo.com/en/docs/air-quality-api')
+        label = 'US AQI' if air['status'] == 'live' else 'Last available US AQI (may be outdated)'
+        return (f"{label}: {current['us_aqi']:.0f} — {current['aqi_category']}\n"
+                f"PM2.5: {current.get('pm2_5') if current.get('pm2_5') is not None else 'unavailable'} µg/m³\n"
+                f"PM10: {current.get('pm10') if current.get('pm10') is not None else 'unavailable'} µg/m³\n"
+                f"Valid time: {display_time_pk(air['valid_at_utc'])}\n"
+                f"Last source pull: {display_time_pk(air['fetched_at_utc'])}\n"
+                f"Data status: {air['status']}. These are CAMS model estimates, not on-site sensor readings.\n\n"
+                'Source: https://open-meteo.com/en/docs/air-quality-api')
+    if (re.search(r'\b(?:current|now|today|latest)\b',q)
+            and re.search(r'\b(?:weather|temperature|humidity|wind|heat index)\b',q)
+            and not re.search(r'\b(?:safe|safety|protect|prevent|precaution)\b',q)
+            and not re.search(r'\b(?:forecast|predicted|prediction|tomorrow)\b',q)):
+        weather = read_dashboard(live=True)['weather']
+        row = weather['current']
+        def display(key):
+            value = row.get(key)
+            return f'{value:.1f}' if isinstance(value,(int,float)) else 'unavailable'
+        return (f"Latest available modeled weather for Karachi ({weather['status']}):\n"
+                f"Air temperature: {display('temperature_c')} °C\n"
+                f"Calculated heat index: {display('heat_index_c')} °C\n"
+                f"Relative humidity: {display('humidity_pct')} %\n"
+                f"Wind speed: {display('wind_speed_ms')} m/s\n"
+                f"Valid at: {display_time_pk(weather['valid_at_utc'])}\n"
+                f"Last source pull: {display_time_pk(weather['fetched_at_utc'])}\n"
+                'These are modeled conditions, not on-site sensor measurements.\n\n'
+                'Source: https://open-meteo.com/en/docs')
+    return get_agent().answer(question)
+
 def export():
     WEB.mkdir(parents=True, exist_ok=True)
-    data = read_dashboard()
+    data = read_dashboard(live=True)
     data['mode'] = 'snapshot'
     (WEB / 'snapshot.json').write_text(json.dumps(data, default=json_default, indent=2), encoding='utf-8')
     questions = {
@@ -103,7 +162,7 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == '/api/dashboard':
             try:
-                self.send_json(200, read_dashboard())
+                self.send_json(200, read_dashboard(live=True))
             except Exception as error:
                 print(f'Dashboard unavailable: {error}', file=sys.stderr)
                 self.send_json(503, {'error': 'Warehouse unavailable. The saved snapshot can still be explored.'})
@@ -129,7 +188,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(question, str) or not question.strip() or len(question) > 1000:
                 self.send_json(400, {'error': 'Enter a question between 1 and 1,000 characters.'})
                 return
-            self.send_json(200, {'answer': get_agent().answer(question), 'mode': 'retrieval'})
+            self.send_json(200, {'answer': answer_insight(question), 'mode': 'retrieval'})
         except (ValueError, json.JSONDecodeError):
             self.send_json(400, {'error': 'Invalid question JSON.'})
         except Exception as error:
