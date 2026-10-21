@@ -55,7 +55,7 @@ Cloud deployment is not yet completed.
 - Pandera
 - Beautiful Soup
 - TF-IDF retrieval
-- Gradio (planned dashboard)
+- Interactive HTML/CSS/SVG/JavaScript dashboard with a read-only Python API
 
 ## Getting Started
 
@@ -85,6 +85,18 @@ python -m pip install -r requirements.txt
 ```
 
 The dependency installation process still needs testing on a fresh computer.
+
+## Website
+
+The interactive HeatSafe website adapts the supplied reference video's glowing network design to the project's weather, ML forecasts, safety guidance and evidence.
+
+From the repository root, run:
+
+```powershell
+python website/server.py
+```
+
+Open http://127.0.0.1:8000. Local mode reads the existing DuckDB gold views and uses the existing retrieval assistant. A static export is also included, explicitly labeled as a project snapshot. See [website/README.md](website/README.md) for setup, export and verification details.
 
 ## Test the Insight Agent
 

@@ -46,6 +46,15 @@ Thumbs.db
 rag/manual/*_files/
 *.js.download
 
+# Website development and reference artifacts
+.web-deps/
+.reference/
+website/.openai/portable/
+website/.site-source/
+website/node_modules/
+website/*.zip
+website/*.tar.gz
+
 # Keep original downloaded webpage snapshots local
 rag/manual/*.html
 rag/raw/*.html

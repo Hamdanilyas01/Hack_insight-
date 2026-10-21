@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071313">
+  <meta name="description" content="Explore the connections behind Karachi's heat risk. Weather evidence, a 24-hour ML forecast, and cited workplace guidance from HeatSafe Pakistan.">
+  <title>HeatSafe Pakistan — Heat Intelligence</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="HeatSafe home"><span class="brand-mark">✳</span><span>HeatSafe<span class="brand-country">PAKISTAN</span></span><span class="brand-divider"></span><span class="brand-caption">Heat intelligence<br>for a safer tomorrow.</span></a>
+      <nav class="view-tabs" aria-label="Workspace views">
+        <button class="view-tab active" data-view="network"><span>⌘</span> Intelligence map</button>
+        <button class="view-tab" data-view="forecast"><span>⌁</span> Forecast</button>
+        <button class="view-tab" data-view="evidence"><span>▧</span> Evidence</button>
+      </nav>
+      <div class="header-actions"><span class="project-tag">HACKINSIGHT ’26</span><button class="icon-button" id="about-button" aria-label="About HeatSafe">i</button><button class="avatar" id="settings-button" aria-label="Open workspace information">HS</button></div>
+    </header>
+
+    <main id="workspace">
+      <section class="intro" aria-label="Workspace overview"><div class="eyebrow"><span class="tiny-star">✳</span> THE HEAT INTELLIGENCE WORKSPACE</div><h1>See the risk.<br><span>Connect the evidence.</span></h1><p>One connected view of Karachi’s heat.<br>Built for the people who work through it.</p><div class="location-pill"><span class="location-dot"></span> Karachi, Pakistan <span class="muted">24.86° N · 67.01° E</span></div></section>
+
+      <div class="graph-toolbar" role="group" aria-label="Map controls"><button class="icon-button active" id="network-layout" aria-label="Radial network layout" title="Radial network">⌘</button><button class="icon-button" id="orbit-layout" aria-label="Orbit layout" title="Orbit layout">◎</button><span></span><button class="icon-button" id="zoom-out" aria-label="Zoom out">−</button><button class="zoom-readout" id="zoom-reset" aria-label="Reset map zoom">100%</button><button class="icon-button" id="zoom-in" aria-label="Zoom in">+</button><span></span><button class="icon-button" id="fit-map" aria-label="Fit map to view" title="Fit map">⛶</button><button class="icon-button" id="motion-toggle" aria-label="Pause ambient animation" aria-pressed="false" title="Pause animation">Ⅱ</button></div>
+
+      <section class="network-stage" id="network-stage" aria-label="Interactive heat intelligence network">
+        <svg id="network" viewBox="0 0 1440 900" role="group" aria-label="HeatSafe evidence network. Select a node to explore its evidence.">
+          <defs>
+            <radialGradient id="core-fill"><stop stop-color="#fff4c8"/><stop offset=".38" stop-color="#d5bd82"/><stop offset=".72" stop-color="#8a835a"/><stop offset="1" stop-color="#223f36"/></radialGradient>
+            <radialGradient id="mint-fill" cx="35%" cy="28%"><stop stop-color="#d3fff1"/><stop offset=".3" stop-color="#77c8ab"/><stop offset=".7" stop-color="#2b695c"/><stop offset="1" stop-color="#102c2a"/></radialGradient>
+            <radialGradient id="amber-fill" cx="35%" cy="28%"><stop stop-color="#fff1cb"/><stop offset=".3" stop-color="#e1bd79"/><stop offset=".7" stop-color="#97764d"/><stop offset="1" stop-color="#3d382c"/></radialGradient>
+            <radialGradient id="violet-fill" cx="35%" cy="28%"><stop stop-color="#e4daff"/><stop offset=".3" stop-color="#b49ad9"/><stop offset=".7" stop-color="#6a548f"/><stop offset="1" stop-color="#28213e"/></radialGradient>
+            <radialGradient id="rose-fill" cx="35%" cy="28%"><stop stop-color="#ffe4e2"/><stop offset=".3" stop-color="#d99da2"/><stop offset=".7" stop-color="#925a68"/><stop offset="1" stop-color="#3f2530"/></radialGradient>
+            <filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="5"/></filter>
+            <filter id="core-glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="13"/></filter>
+            <linearGradient id="edge-gradient"><stop stop-color="#9dc9b0" stop-opacity=".08"/><stop offset=".5" stop-color="#b9d8bf" stop-opacity=".55"/><stop offset="1" stop-color="#9dc9b0" stop-opacity=".16"/></linearGradient>
+          </defs>
+          <g id="map-transform"><g id="edges"></g><g id="particles"></g><g id="nodes"></g></g>
+        </svg>
+        <div class="map-coordinate coord-top">24.8607° N<br>67.0011° E</div><div class="map-coordinate coord-bottom">KARACHI HEAT NETWORK<br><span>WEATHER → INTELLIGENCE → ACTION</span></div>
+      </section>
+
+      <div class="data-status"><span class="status-dot"></span><span id="data-mode">Loading project evidence</span><span class="status-divider">/</span><span id="updated-label">Connecting…</span><button id="refresh-button" aria-label="Refresh evidence" title="Refresh evidence">↻</button></div>
+
+      <aside class="legend glass" aria-label="Filter network"><div class="panel-label">EXPLORE CONNECTIONS <span>↗</span></div><button class="legend-item" data-filter="weather" aria-pressed="false"><i class="legend-dot mint"></i>Weather signals <span>05</span></button><button class="legend-item" data-filter="forecast" aria-pressed="false"><i class="legend-dot amber"></i>Heat forecast <span>04</span></button><button class="legend-item" data-filter="safety" aria-pressed="false"><i class="legend-dot rose"></i>Worker safety <span>04</span></button><button class="legend-item" data-filter="evidence" aria-pressed="false"><i class="legend-dot violet"></i>Verified evidence <span>05</span></button><div class="legend-hint">Select a node. Follow the connection.</div></aside>
+
+      <aside class="detail-panel glass" id="detail-panel" aria-label="Selected node details">
+        <div class="panel-topline"><span class="panel-label"><span class="tiny-star">✳</span> NODE INSIGHT</span><button class="icon-button" id="close-detail" aria-label="Close node details">×</button></div>
+        <div id="detail-content"></div>
+      </aside>
+
+      <section class="agent-dock glass" aria-label="HeatSafe insight assistant"><div class="dock-stats"><div><span>24H HEAT INDEX</span><strong id="dock-heat">—<small>°C</small></strong></div><div><span>RISK CATEGORY</span><strong class="risk-text" id="dock-risk">—</strong></div><div><span>MODEL TEST MAE</span><strong id="dock-mae">—<small>°C</small></strong></div><div><span>GUIDANCE SOURCES</span><strong>03<small>verified</small></strong></div></div><form id="ask-form"><label class="sr-only" for="question">Ask HeatSafe a question</label><span class="input-spark">✳</span><input id="question" type="text" maxlength="1000" autocomplete="off" placeholder="Ask how to stay safe in the heat…"><button type="submit" class="send-button" aria-label="Ask insight agent">↗</button></form><div class="dock-footer"><span><i class="status-dot"></i> Insight agent <span class="muted">· Evidence retrieval</span></span><button id="analysis-button">✧ Explore forecast <span>↗</span></button></div></section>
+
+      <section id="content-view" class="content-view glass" hidden aria-label="Workspace detail view"></section>
+      <section class="answer-panel glass" id="answer-panel" hidden aria-label="Insight agent answer" aria-live="polite"><div class="panel-topline"><span class="panel-label">✧ HEATSAFE INSIGHT</span><button class="icon-button" id="close-answer" aria-label="Close assistant answer">×</button></div><div id="answer-content"></div></section>
+      <div class="workspace-footer"><span class="status-dot"></span> DESIGNED AROUND PEOPLE. GROUNDED IN EVIDENCE.<button id="help-button">? <span>Map guide</span></button></div>
+    </main>
+  </div>
+  <dialog id="info-dialog" class="glass"><button class="dialog-close icon-button" aria-label="Close dialog">×</button><div id="dialog-content"></div></dialog>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>
