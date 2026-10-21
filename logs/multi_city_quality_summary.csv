@@ -1,0 +1,4 @@
+city,raw_rows,invalid_timestamps,duplicate_timestamps,null_temperature_2m,null_relative_humidity_2m,null_dew_point_2m,null_wind_speed_10m,humidity_outside_0_100,negative_wind,temperature_outside_minus50_60,non_hourly_gaps,status
+Lahore,52608,0,0,0,0,0,0,0,0,0,0,PASS
+Islamabad,52608,0,0,0,0,0,0,0,0,0,0,PASS
+Multan,52608,0,0,0,0,0,0,0,0,0,0,PASS
