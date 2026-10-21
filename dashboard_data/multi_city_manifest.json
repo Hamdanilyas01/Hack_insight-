@@ -1,0 +1,12 @@
+{
+  "retrieved_at_utc": "2026-10-21T15:01:55.615177+00:00",
+  "source": "https://api.open-meteo.com/v1/forecast",
+  "request_url": "https://api.open-meteo.com/v1/forecast?latitude=24.8607%2C31.5204%2C33.6844%2C33.5651%2C31.4504%2C30.1575%2C34.0151%2C30.1798%2C25.396%2C32.1877%2C32.4945%2C27.7139%2C29.3956%2C28.2819%2C32.0836%2C34.1463&longitude=67.0011%2C74.3587%2C73.0479%2C73.0169%2C73.135%2C71.5249%2C71.5249%2C66.975%2C68.3578%2C74.1945%2C74.5229%2C68.8369%2C71.6836%2C68.438%2C72.6711%2C73.2117&hourly=temperature_2m%2Crelative_humidity_2m%2Capparent_temperature&forecast_hours=48&timezone=Asia%2FKarachi",
+  "city_count": 16,
+  "forecast_rows": 768,
+  "quality_flagged_rows": 0,
+  "raw_response_sha256": "c23e967d9a85ddc5c256fc3a795a7c6ef6719acbeb586bd68f4eb39fcb3e20b6",
+  "dashboard_json_sha256": "10e03da19991b3efc7631034a124c5e59147e9975cf6fa24cc91f12664368640",
+  "dashboard_csv_sha256": "24e17526b93eba32ff0470da3594b0ea2085a392544d16699da5d0820c12baf3",
+  "limitation": "Weather-provider city forecasts; not HeatSafe ML model predictions or workplace exposure measurements."
+}
