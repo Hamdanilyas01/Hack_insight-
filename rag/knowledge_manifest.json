@@ -1,0 +1,52 @@
+{
+  "project": "HeatSafe Pakistan",
+  "created_at_utc": "2026-10-21T07:12:15.834701+00:00",
+  "source_count": 3,
+  "chunk_count": 17,
+  "knowledge_file": "rag\\knowledge_chunks.jsonl",
+  "knowledge_sha256": "6784d80fe7e7ee76a709fc7da5616243bac3637e50fb8dd48da1973fbe96f565",
+  "sources": [
+    {
+      "source_id": "NIOSH_001",
+      "publisher": "CDC NIOSH",
+      "source_url": "https://www.cdc.gov/niosh/heat-stress/recommendations/index.html",
+      "indexed_at_utc": "2026-10-21T07:12:15.168967+00:00",
+      "retrieval_method": "manual_browser_save",
+      "http_status": null,
+      "manual_file": "rag\\manual\\NIOSH_001.html",
+      "raw_file": "rag\\raw\\NIOSH_001_20261021T071215048960Z.html",
+      "raw_sha256": "954b3ee7b230d7331e4d3948600505918a0b597b87cfad1f714ddfaf77471458",
+      "extracted_words": 842,
+      "chunks": 7,
+      "status": "PASS"
+    },
+    {
+      "source_id": "HSE_001",
+      "publisher": "UK Health and Safety Executive",
+      "source_url": "https://www.hse.gov.uk/temperature/employer/heat-stress.htm",
+      "indexed_at_utc": "2026-10-21T07:12:15.659694+00:00",
+      "retrieval_method": "direct_https",
+      "http_status": 200,
+      "manual_file": null,
+      "raw_file": "rag\\raw\\HSE_001_20261021T071215048960Z.html",
+      "raw_sha256": "f79c6095ee4443d56734ff1fd49f28b54ddd05c1ad6bb511569fc7890be0c2af",
+      "extracted_words": 939,
+      "chunks": 7,
+      "status": "PASS"
+    },
+    {
+      "source_id": "NOAA_001",
+      "publisher": "NOAA National Weather Service",
+      "source_url": "https://www.weather.gov/safety/heat-index",
+      "indexed_at_utc": "2026-10-21T07:12:15.824111+00:00",
+      "retrieval_method": "manual_browser_save",
+      "http_status": null,
+      "manual_file": "rag\\manual\\NOAA_001.html",
+      "raw_file": "rag\\raw\\NOAA_001_20261021T071215048960Z.html",
+      "raw_sha256": "1f5057f18ba268bc3f02890a06ce43c42704a0ea626f4a708716255da6a9d278",
+      "extracted_words": 312,
+      "chunks": 3,
+      "status": "PASS"
+    }
+  ]
+}

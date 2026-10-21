@@ -1,0 +1,13 @@
+test,expected,observed,passed,status
+Pandera detects injected invalid values,True,True,True,PASS
+Exact duplicate removed,1,1,True,PASS
+Conflicting duplicate rows flagged,2,2,True,PASS
+Invalid humidity detected,1,1,True,PASS
+Negative wind detected,1,1,True,PASS
+Missing temperature filled,1,1,True,PASS
+Invalid humidity filled,1,1,True,PASS
+Invalid wind filled,1,1,True,PASS
+Two-hour dew point gap not filled,0,0,True,PASS
+Unresolved dew point values flagged,2,2,True,PASS
+Extreme temperature flagged,1,1,True,PASS
+Final Pandera catches retained outlier,True,True,True,PASS

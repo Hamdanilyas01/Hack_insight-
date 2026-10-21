@@ -1,0 +1,10 @@
+table,row_count
+raw.weather_era5,52608
+raw.cams_air_quality,26304
+raw.source_manifest,4
+cleaned.weather_era5,52608
+cleaned.cams_air_quality,26304
+processed.hourly_features,52608
+gold.hourly_evidence,52608
+gold.daily_summary,2193
+gold.quality_summary,2

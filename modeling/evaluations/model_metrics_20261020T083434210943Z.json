@@ -1,0 +1,20 @@
+{
+  "selected_model": "HistGradientBoosting",
+  "baseline_name": "same_hour_previous_day_persistence",
+  "validation_model_mae_c": 1.2637846007478792,
+  "validation_baseline_mae_c": 1.329438597497368,
+  "test_model_mae_c": 1.0559502027425143,
+  "test_baseline_mae_c": 1.1074064033738078,
+  "test_model_rmse_c": 1.433446744427921,
+  "test_model_r2": 0.9683037447965397,
+  "model_beats_baseline": true,
+  "interval_nominal_coverage": 0.9,
+  "interval_empirical_coverage": 0.9537671232876712,
+  "interval_half_width_c": 3.00654671184229,
+  "train_rows": 34992,
+  "validation_rows": 4368,
+  "calibration_rows": 4416,
+  "test_rows": 8760,
+  "dataset_sha256": "c5c34adc4581d7655ee59c3fd047c8c822193db18711e82d2f37296e67c9c5eb",
+  "baseline_contract_sha256": "45476ed36c66e3c9502b0eede75ee8976b0d79f573d789ecab9ece5ebcd8fb3f"
+}

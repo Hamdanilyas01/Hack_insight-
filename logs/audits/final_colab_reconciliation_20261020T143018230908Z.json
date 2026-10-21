@@ -1,0 +1,25 @@
+{
+  "project": "HeatSafe Pakistan",
+  "audit_type": "Final Colab Reconciliation",
+  "audit_time_utc": "2026-10-20T14:30:18.180462+00:00",
+  "original_audit_preserved": true,
+  "raw_to_saved_hi_tolerance_c": 1e-09,
+  "prediction_replay_tolerance_c": 1e-10,
+  "rows_in_saved_dataset": 52584,
+  "test_rows": 8760,
+  "feature_count": 18,
+  "matching_predictions": 8760,
+  "max_heat_index_difference_c": 3.268496584496461e-13,
+  "max_prediction_difference_c": 7.105427357601002e-15,
+  "checks": {
+    "source_hashes_verified": true,
+    "raw_to_saved_heat_index_within_tolerance": true,
+    "saved_feature_model_reproduction": true,
+    "expected_feature_count": true
+  },
+  "all_checks_passed": true,
+  "model_file_sha256": "9e240d399e1e2e25c8b9199eb410a8a5cdc554aa9bdfd91df4c82bca038bc2e4",
+  "predictions_file_sha256": "d90c5c91724d5f9ec8dc074029336fdee13cdd4d33019c7eebb89bbe79eaa082",
+  "reproduction_basis": "Saved canonical model-input values",
+  "note": "The original raw-only reconstruction had small floating-point differences. This report verifies numerical equivalence of raw-derived heat index and exact prediction replay from saved canonical training features. It does not claim bitwise identity of raw-only feature regeneration."
+}

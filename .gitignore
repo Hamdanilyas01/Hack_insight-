@@ -1,0 +1,51 @@
+
+# Python environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*credentials*.json
+*secret*.json
+
+# Local Prefect files
+.prefect/
+
+# Generated local databases
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.sqlite3
+
+# Large/generated datasets
+data/raw/
+data/cleaned/
+data/processed/
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# IDE and operating system
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Ignore browser-downloaded website assets
+rag/manual/*_files/
+*.js.download
+
+# Keep original downloaded webpage snapshots local
+rag/manual/*.html
+rag/raw/*.html

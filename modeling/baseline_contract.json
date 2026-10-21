@@ -1,0 +1,29 @@
+{
+  "project": "HeatSafe Pakistan",
+  "version": "baseline-v1",
+  "target": "heat_index_24h_ahead_c",
+  "target_description": "NWS heat index 24 hours ahead, derived from historical temperature and relative humidity",
+  "forecast_horizon_hours": 24,
+  "baseline_name": "same_hour_previous_day_persistence",
+  "baseline_rule": "Predicted heat index at t+24h equals the calculated heat index at time t",
+  "primary_metric": "MAE_C",
+  "success_rule": "ML model test MAE must be lower than the predeclared baseline test MAE",
+  "split_rules_utc": {
+    "train": "target before 2024-01-01",
+    "validation": "2024-01-01 to 2024-06-30",
+    "calibration": "2024-07-01 to 2024-12-31",
+    "test": "2025-01-01 to 2025-12-31"
+  },
+  "uncertainty_plan": "90 percent split-conformal interval using calibration-period absolute errors",
+  "group_error_plan": [
+    "target_month_pk",
+    "working_hour_group"
+  ],
+  "limitations": [
+    "Target is a weather-derived heat index, not observed illness",
+    "Heat index does not fully represent direct-sun worksite exposure",
+    "Historical ERA5 is reanalysis, not archived issued forecasts",
+    "Operational use requires current inputs available at issue time"
+  ],
+  "method_reference": "https://www.weather.gov/tbw/heatindex"
+}

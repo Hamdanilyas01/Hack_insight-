@@ -1,0 +1,14 @@
+action,rule,row_count,reason
+fix,standardize_utc_time,52608,Standardized existing UTC timestamps for consistent joins.
+flag,flag_invalid_time,0,Requires review; original measurements preserved.
+flag,flag_duplicate_time,0,Requires review; original measurements preserved.
+flag,flag_outside_period,0,Requires review; original measurements preserved.
+flag,flag_temperature_review,0,Requires review; original measurements preserved.
+flag,flag_dewpoint_review,0,Requires review; original measurements preserved.
+fix,flag_humidity_range,0,Physically invalid value replaced with missing; original preserved in raw JSON.
+fix,flag_negative_wind,0,Physically invalid value replaced with missing; original preserved in raw JSON.
+fill,interpolate_temperature_2m,0,Filled isolated one-hour gaps using adjacent valid values.
+fill,interpolate_relative_humidity_2m,0,Filled isolated one-hour gaps using adjacent valid values.
+fill,interpolate_dew_point_2m,0,Filled isolated one-hour gaps using adjacent valid values.
+fill,interpolate_wind_speed_10m,0,Filled isolated one-hour gaps using adjacent valid values.
+flag,remaining_missing_values,0,Missing values requiring later handling.

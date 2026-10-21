@@ -1,0 +1,66 @@
+
+{
+  "project": "HeatSafe Pakistan",
+  "knowledge_base_version": "1.0",
+  "purpose": "Evidence-based heat safety guidance for Karachi construction workers",
+  "rules": {
+    "weather_and_ml_numbers": "DuckDB gold tables only",
+    "health_guidance": "Approved official knowledge sources only",
+    "citations_required": true,
+    "unsupported_answer": "I don't know based on the available verified evidence.",
+    "no_invented_statistics": true,
+    "no_uncited_health_recommendations": true
+  },
+  "sources": [
+    {
+      "source_id": "NIOSH_001",
+      "publisher": "CDC NIOSH",
+      "title": "Workplace Recommendations for Heat Stress",
+      "url": "https://www.cdc.gov/niosh/heat-stress/recommendations/index.html",
+      "license_evidence_url": "https://www.cdc.gov/other/agencymaterials.html",
+      "license_note": "CDC-created content is generally public domain. Attribution is required. Third-party content must be checked separately.",
+      "use": "Text guidance with attribution; exclude third-party images",
+      "topics": [
+        "hydration",
+        "rest breaks",
+        "acclimatization",
+        "heat illness prevention",
+        "workplace controls"
+      ]
+    },
+    {
+  "source_id": "HSE_001",
+  "publisher": "UK Health and Safety Executive",
+  "title": "Temperature in the Workplace: Heat Stress",
+  "url": "https://www.hse.gov.uk/temperature/employer/heat-stress.htm",
+  "license_evidence_url": "https://www.hse.gov.uk/help/copyright.htm",
+  "license_note": "Open Government Licence v3.0 for Crown-owned content unless otherwise stated. Exclude third-party material, photographs and logos. Attribute the Health and Safety Executive.",
+  "use": "Retrieve, paraphrase and cite official workplace heat-stress guidance",
+  "topics": [
+    "heat stress",
+    "dehydration",
+    "rest breaks",
+    "acclimatization",
+    "worker safety",
+    "protective equipment",
+    "heat illness"
+  ]
+    },
+    {
+      "source_id": "NOAA_001",
+      "publisher": "NOAA National Weather Service",
+      "title": "Heat Forecast Tools and Heat Index",
+      "url": "https://www.weather.gov/safety/heat-index",
+      "license_evidence_url": "https://www.weather.gov/disclaimer",
+      "license_note": "NWS content is generally public domain unless otherwise stated. Attribution must not imply official endorsement.",
+      "use": "Heat index explanations with source attribution",
+      "topics": [
+        "heat index",
+        "temperature",
+        "humidity",
+        "heat risk",
+        "forecast uncertainty"
+      ]
+    }
+  ]
+}

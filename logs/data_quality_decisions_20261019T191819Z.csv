@@ -1,0 +1,15 @@
+decision_time_utc,source,action,rule,row_count,reason
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fix,standardize_utc,52608,Standardized timestamps as UTC for consistent time-based analysis.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,flag_invalid_time,0,Value requires review; original raw data remains unchanged.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,flag_duplicate_time,0,Value requires review; original raw data remains unchanged.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,flag_outside_period,0,Value requires review; original raw data remains unchanged.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,flag_temperature_review,0,Value requires review; original raw data remains unchanged.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,flag_dewpoint_review,0,Value requires review; original raw data remains unchanged.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,flag_original_missing,0,Value requires review; original raw data remains unchanged.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fix,flag_humidity_range,0,Physically invalid value replaced with missing in cleaned layer.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fix,flag_negative_wind,0,Physically invalid value replaced with missing in cleaned layer.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fill,one_hour_interpolation_temperature_2m,0,Filled isolated missing hour using adjacent valid readings.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fill,one_hour_interpolation_relative_humidity_2m,0,Filled isolated missing hour using adjacent valid readings.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fill,one_hour_interpolation_dew_point_2m,0,Filled isolated missing hour using adjacent valid readings.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,fill,one_hour_interpolation_wind_speed_10m,0,Filled isolated missing hour using adjacent valid readings.
+2026-10-19T19:18:19.214308+00:00,Open-Meteo ERA5,flag,remaining_missing,0,Missing readings remain after permitted interpolation.

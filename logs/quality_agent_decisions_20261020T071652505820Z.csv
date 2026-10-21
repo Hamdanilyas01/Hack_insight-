@@ -1,0 +1,26 @@
+decision_time_utc,agent,source,action,rule,row_count,reason
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,standardize_utc,52608,Converted timestamps to UTC for reliable hourly joins.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,wind_unit_already_ms,0,Wind speed is already in metres per second; no conversion needed.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,remove_exact_duplicates,0,Removed exact duplicate records from cleaned data only.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,flag_invalid_time,0,Time-related issue requires review; raw record is preserved.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,flag_conflicting_duplicate,0,Time-related issue requires review; raw record is preserved.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,flag_outside_period,0,Time-related issue requires review; raw record is preserved.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,flag_non_hourly_time,0,Time-related issue requires review; raw record is preserved.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,replace_nonfinite_temperature_2m,0,Replaced non-finite values with missing in cleaned data.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,replace_nonfinite_relative_humidity_2m,0,Replaced non-finite values with missing in cleaned data.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,replace_nonfinite_dew_point_2m,0,Replaced non-finite values with missing in cleaned data.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,replace_nonfinite_wind_speed_10m,0,Replaced non-finite values with missing in cleaned data.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,original_missing_temperature_2m,0,Recorded missing values before interpolation.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,original_missing_relative_humidity_2m,0,Recorded missing values before interpolation.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,original_missing_dew_point_2m,0,Recorded missing values before interpolation.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,original_missing_wind_speed_10m,0,Recorded missing values before interpolation.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,flag_invalid_humidity,0,Invalid physical value replaced with missing; raw measurement preserved.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fix,flag_invalid_wind,0,Invalid physical value replaced with missing; raw measurement preserved.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,flag_temperature_review,0,Suspicious measurement flagged instead of automatically changed.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,flag_dewpoint_review,0,Suspicious measurement flagged instead of automatically changed.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fill,one_hour_interpolation_temperature_2m,0,Filled isolated one-hour missing value using valid adjacent hours.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fill,one_hour_interpolation_relative_humidity_2m,0,Filled isolated one-hour missing value using valid adjacent hours.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fill,one_hour_interpolation_dew_point_2m,0,Filled isolated one-hour missing value using valid adjacent hours.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,fill,one_hour_interpolation_wind_speed_10m,0,Filled isolated one-hour missing value using valid adjacent hours.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,remaining_missing,0,Rows still containing missing weather values require review.
+2026-10-20T07:16:52.505936+00:00,HeatSafeDataQualityAgent,Open-Meteo ERA5,flag,missing_hourly_timestamps,0,"Found 0 absent hourly timestamps; these are missing time slots, not existing rows."

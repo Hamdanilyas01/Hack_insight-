@@ -1,0 +1,25 @@
+{
+  "task": "derived_heat_index_risk_classification",
+  "model": "HistGradientBoosting",
+  "evaluation_split": "held_out_2025_test",
+  "source_predictions_file": "test_predictions_20261020T083434210943Z.csv",
+  "actual_column": "target_heat_index_c",
+  "prediction_column": "model_prediction_c",
+  "test_rows": 8760,
+  "accuracy": 0.8740867579908675,
+  "macro_precision": 0.8515482030662203,
+  "macro_recall": 0.8478487859870056,
+  "macro_f1": 0.8489617873246076,
+  "weighted_precision": 0.8773833836763119,
+  "weighted_recall": 0.8740867579908675,
+  "weighted_f1": 0.8751310204261203,
+  "baseline_weighted_f1": 0.8726027397260274,
+  "thresholds_fahrenheit": {
+    "Caution": 80,
+    "Extreme Caution": 90,
+    "Danger": 103,
+    "Extreme Danger": 125
+  },
+  "reference": "https://www.weather.gov/ama/heatindex",
+  "limitation": "Categories are derived from heat index, not observed worker illness or workplace-specific safety outcomes."
+}

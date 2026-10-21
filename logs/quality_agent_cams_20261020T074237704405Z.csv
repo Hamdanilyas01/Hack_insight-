@@ -1,0 +1,28 @@
+decision_time_utc,agent,source,action,rule,row_count,reason
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,standardize_utc,26304,Standardized timestamps to UTC for integration with weather data.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,unverified_pollutant_units,0,Expected pollutant units are micrograms per cubic metre. Unverified columns: []
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,remove_exact_duplicates,0,Removed identical records from cleaned data only.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_invalid_time,0,Timestamp requires review; raw measurements remain unchanged.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_duplicate_time,0,Timestamp requires review; raw measurements remain unchanged.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_outside_period,0,Timestamp requires review; raw measurements remain unchanged.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_non_hourly_time,0,Timestamp requires review; raw measurements remain unchanged.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,replace_nonfinite_pm2_5,0,Replaced non-finite value with missing in cleaned data.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,original_missing_pm2_5,0,Recorded missing pollution values before quality corrections.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,flag_negative_pm2_5,0,Negative pollutant concentration replaced with missing.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_extreme_pm2_5,0,Concentration exceeds a conservative 1000 ug/m3 screening threshold; retained for manual review.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,replace_nonfinite_pm10,0,Replaced non-finite value with missing in cleaned data.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,original_missing_pm10,0,Recorded missing pollution values before quality corrections.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,flag_negative_pm10,0,Negative pollutant concentration replaced with missing.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_extreme_pm10,0,Concentration exceeds a conservative 1000 ug/m3 screening threshold; retained for manual review.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,replace_nonfinite_nitrogen_dioxide,0,Replaced non-finite value with missing in cleaned data.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,original_missing_nitrogen_dioxide,0,Recorded missing pollution values before quality corrections.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,flag_negative_nitrogen_dioxide,0,Negative pollutant concentration replaced with missing.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_extreme_nitrogen_dioxide,0,Concentration exceeds a conservative 1000 ug/m3 screening threshold; retained for manual review.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,replace_nonfinite_ozone,0,Replaced non-finite value with missing in cleaned data.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,original_missing_ozone,0,Recorded missing pollution values before quality corrections.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fix,flag_negative_ozone,0,Negative pollutant concentration replaced with missing.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,flag_extreme_ozone,0,Concentration exceeds a conservative 1000 ug/m3 screening threshold; retained for manual review.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,pm25_above_pm10,0,PM2.5 exceeds PM10; possible consistency issue requiring review.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,remaining_missing,0,Missing pollutant values remain; no automatic interpolation applied.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,fill,pollutant_interpolation_skipped,0,CAMS Global is a modelled dataset; missing pollution values are retained rather than automatically interpolated again.
+2026-10-20T07:42:37.704533+00:00,HeatSafeCAMSQualityAgent,CAMS Global via Open-Meteo,flag,missing_hourly_timestamps,0,0 expected hourly time slots are absent; these are missing slots rather than existing rows.

@@ -1,0 +1,224 @@
+{
+  "audit_time_utc": "2026-10-20T14:08:14.038233+00:00",
+  "project": "HeatSafe Pakistan",
+  "total_checks": 42,
+  "passed": 41,
+  "failed": 1,
+  "ready_for_local_migration": false,
+  "historical_model_mae_c": 1.0559502027425143,
+  "historical_baseline_mae_c": 1.1074064033738078,
+  "historical_interval_coverage": 0.9537671232876712,
+  "max_reproduced_model_difference_c": 0.271439844227757,
+  "checks": [
+    {
+      "check": "SHA-256 weather_raw",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "SHA-256 cams_raw",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "SHA-256 ml_dataset",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "SHA-256 warehouse",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "SHA-256 live_raw",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Manifest available",
+      "status": "PASS",
+      "details": "5 records"
+    },
+    {
+      "check": "Manifest schema",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Manifest provenance: weather_raw",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Manifest provenance: cams_raw",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Manifest provenance: live_raw",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "ERA5 raw row count",
+      "status": "PASS",
+      "details": "52608"
+    },
+    {
+      "check": "CAMS raw row count",
+      "status": "PASS",
+      "details": "26304"
+    },
+    {
+      "check": "ERA5 cleaned row count",
+      "status": "PASS",
+      "details": "52608"
+    },
+    {
+      "check": "CAMS cleaned row count",
+      "status": "PASS",
+      "details": "26304"
+    },
+    {
+      "check": "ERA5 Data Quality status",
+      "status": "PASS",
+      "details": "52608 PASS rows"
+    },
+    {
+      "check": "CAMS Data Quality status",
+      "status": "PASS",
+      "details": "26304 PASS rows"
+    },
+    {
+      "check": "weather_dq_log decision log",
+      "status": "PASS",
+      "details": "25 decisions"
+    },
+    {
+      "check": "cams_dq_log decision log",
+      "status": "PASS",
+      "details": "27 decisions"
+    },
+    {
+      "check": "Data Quality stress tests",
+      "status": "PASS",
+      "details": "12/12 passed"
+    },
+    {
+      "check": "Warehouse: raw.weather_era5",
+      "status": "PASS",
+      "details": "52608"
+    },
+    {
+      "check": "Warehouse: raw.cams_air_quality",
+      "status": "PASS",
+      "details": "26304"
+    },
+    {
+      "check": "Warehouse: cleaned.weather_era5",
+      "status": "PASS",
+      "details": "52608"
+    },
+    {
+      "check": "Warehouse: cleaned.cams_air_quality",
+      "status": "PASS",
+      "details": "26304"
+    },
+    {
+      "check": "Warehouse: processed.hourly_features",
+      "status": "PASS",
+      "details": "52608"
+    },
+    {
+      "check": "Warehouse: gold.hourly_evidence",
+      "status": "PASS",
+      "details": "52608"
+    },
+    {
+      "check": "Warehouse: gold.daily_summary",
+      "status": "PASS",
+      "details": "2193"
+    },
+    {
+      "check": "Warehouse: gold.quality_summary",
+      "status": "PASS",
+      "details": "2"
+    },
+    {
+      "check": "Pre-declared baseline contract",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "ML feature count",
+      "status": "PASS",
+      "details": "18"
+    },
+    {
+      "check": "Saved uncertainty interval",
+      "status": "PASS",
+      "details": "3.006547"
+    },
+    {
+      "check": "Held-out test rows",
+      "status": "PASS",
+      "details": "8760"
+    },
+    {
+      "check": "Model beats baseline on test MAE",
+      "status": "PASS",
+      "details": "ML 1.055950 | Baseline 1.107406"
+    },
+    {
+      "check": "Historical interval coverage",
+      "status": "PASS",
+      "details": "95.38%"
+    },
+    {
+      "check": "Errors by group report",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Optimization log",
+      "status": "PASS",
+      "details": "2 records"
+    },
+    {
+      "check": "Historical model prediction reproduction",
+      "status": "FAIL",
+      "details": "Max difference: 0.27143984 \u00b0C"
+    },
+    {
+      "check": "Historical baseline reproduction",
+      "status": "PASS",
+      "details": "Max difference: 0.00000000 \u00b0C"
+    },
+    {
+      "check": "Historical heat-index target reproduction",
+      "status": "PASS",
+      "details": "Max difference: 0.00000000 \u00b0C"
+    },
+    {
+      "check": "Live forecast has 24 consecutive hours",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Live ML horizon is 24 hours",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Live ML source SHA-256 matches",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "check": "Live ML model SHA-256 matches",
+      "status": "PASS",
+      "details": ""
+    }
+  ]
+}
