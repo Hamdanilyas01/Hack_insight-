@@ -71,9 +71,12 @@ class APITests(unittest.TestCase):
         self.assertIn('unavailable', json.loads(body)['error'])
 
     def test_unsupported_agent_question(self):
-        code, body = self.request('POST', '/api/insight', json.dumps({'question':'How many hospital admissions were there?'}))
+        reply={'answer':'I don’t have hospital records, but I can explain the heat outlook.', 'supported':False,'citation_ids':[]}
+        with patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'generate',return_value=reply):
+            code, body = self.request('POST', '/api/insight', json.dumps({'question':'How many hospital admissions were there?'}))
         self.assertEqual(code, 200)
-        self.assertIn("I don't know", json.loads(body)['answer'])
+        self.assertFalse(json.loads(body)['supported'])
+        self.assertEqual(json.loads(body)['mode'],'gemini')
 
     def test_static_server_does_not_expose_database(self):
         for path in ['/warehouse/heatsafe_live.duckdb', '/server.py', '/api/unknown']:

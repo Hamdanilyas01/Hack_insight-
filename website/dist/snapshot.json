@@ -1,6 +1,43 @@
 {
+  "city": {
+    "id": "karachi",
+    "name": "Karachi",
+    "region": "Sindh",
+    "latitude": 24.8607,
+    "longitude": 67.0011
+  },
+  "cities": [
+    {
+      "id": "karachi",
+      "name": "Karachi",
+      "region": "Sindh",
+      "latitude": 24.8607,
+      "longitude": 67.0011
+    },
+    {
+      "id": "lahore",
+      "name": "Lahore",
+      "region": "Punjab",
+      "latitude": 31.5204,
+      "longitude": 74.3587
+    },
+    {
+      "id": "islamabad",
+      "name": "Islamabad",
+      "region": "Islamabad Capital Territory",
+      "latitude": 33.6844,
+      "longitude": 73.0479
+    },
+    {
+      "id": "multan",
+      "name": "Multan",
+      "region": "Punjab",
+      "latitude": 30.1575,
+      "longitude": 71.5249
+    }
+  ],
   "mode": "snapshot",
-  "exported_at": "2026-10-21T16:18:05.052401+00:00",
+  "exported_at": "2026-10-21T16:38:27.055568+00:00",
   "fresh": false,
   "verified": true,
   "forecast": {
@@ -446,19 +483,19 @@
     "source": "Open-Meteo weather models",
     "source_url": "https://open-meteo.com/en/docs",
     "measurement_type": "modeled",
-    "fetched_at_utc": "2026-10-21T16:18:06.537530+00:00",
-    "valid_at_utc": "2026-10-21T16:15:00+00:00",
+    "fetched_at_utc": "2026-10-21T16:38:27.768933+00:00",
+    "valid_at_utc": "2026-10-21T16:30:00+00:00",
     "cache_hit": false,
     "current": {
-      "time_utc": "2026-10-21T16:15:00+00:00",
-      "temperature_c": 27.7,
+      "time_utc": "2026-10-21T16:30:00+00:00",
+      "temperature_c": 27.6,
       "humidity_pct": 81.0,
-      "dew_point_c": 24.1,
-      "wind_speed_ms": 2.35,
+      "dew_point_c": 24.0,
+      "wind_speed_ms": 2.4,
       "weather_code": 0.0,
       "is_day": 0.0,
       "precipitation_probability": null,
-      "heat_index_c": 31.5
+      "heat_index_c": 31.25
     },
     "hourly": [
       {
@@ -1135,7 +1172,7 @@
         "heat_index_c": 31.5
       }
     ],
-    "forecast_start_utc": "2026-10-21T16:15:00+00:00",
+    "forecast_start_utc": "2026-10-21T16:30:00+00:00",
     "note": "Model-based conditions, not a reading from an on-site sensor.",
     "daily": [
       {
@@ -1163,7 +1200,7 @@
     "source": "CAMS Global via Open-Meteo",
     "source_url": "https://open-meteo.com/en/docs/air-quality-api",
     "measurement_type": "modeled",
-    "fetched_at_utc": "2026-10-21T16:18:06.374442+00:00",
+    "fetched_at_utc": "2026-10-21T16:38:27.643811+00:00",
     "valid_at_utc": "2026-10-21T16:00:00+00:00",
     "cache_hit": false,
     "current": {
@@ -9843,7 +9880,7 @@
     "source_url": "https://open-meteo.com/en/docs/air-quality-api",
     "pollutant_unit": "\u00b5g/m\u00b3"
   },
-  "server_response_at_utc": "2026-10-21T16:18:06.539047+00:00",
+  "server_response_at_utc": "2026-10-21T16:38:27.769938+00:00",
   "pipeline": {
     "prefect_running_on_vercel": false,
     "scheduled_cloud_job": false,
@@ -9877,7 +9914,7 @@
         "value": null,
         "unit": "",
         "source": "Open-Meteo weather models",
-        "time_utc": "2026-10-21T16:15:00+00:00",
+        "time_utc": "2026-10-21T16:30:00+00:00",
         "description": "",
         "status": "live",
         "view": "forecast",
@@ -9887,10 +9924,10 @@
         "id": "temperature",
         "group": "weather",
         "label": "Temperature",
-        "value": 27.7,
+        "value": 27.6,
         "unit": "\u00b0C",
         "source": "Open-Meteo weather models",
-        "time_utc": "2026-10-21T16:15:00+00:00",
+        "time_utc": "2026-10-21T16:30:00+00:00",
         "description": "Model-based conditions, not a reading from an on-site sensor.",
         "status": "live",
         "view": "forecast",
@@ -9900,10 +9937,10 @@
         "id": "heatindex",
         "group": "weather",
         "label": "Feels like \u00b7 heat index",
-        "value": 31.5,
+        "value": 31.25,
         "unit": "\u00b0C",
         "source": "Open-Meteo weather models",
-        "time_utc": "2026-10-21T16:15:00+00:00",
+        "time_utc": "2026-10-21T16:30:00+00:00",
         "description": "Heat index is calculated from air temperature and humidity.",
         "status": "live",
         "view": "forecast",
@@ -9916,7 +9953,7 @@
         "value": 81.0,
         "unit": "%",
         "source": "Open-Meteo weather models",
-        "time_utc": "2026-10-21T16:15:00+00:00",
+        "time_utc": "2026-10-21T16:30:00+00:00",
         "description": "Model-based conditions, not a reading from an on-site sensor.",
         "status": "live",
         "view": "forecast",
@@ -9926,10 +9963,10 @@
         "id": "wind",
         "group": "weather",
         "label": "Wind speed",
-        "value": 2.35,
+        "value": 2.4,
         "unit": "m/s",
         "source": "Open-Meteo weather models",
-        "time_utc": "2026-10-21T16:15:00+00:00",
+        "time_utc": "2026-10-21T16:30:00+00:00",
         "description": "Model-based conditions, not a reading from an on-site sensor.",
         "status": "live",
         "view": "forecast",

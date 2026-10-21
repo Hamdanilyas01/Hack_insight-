@@ -41,6 +41,10 @@ def main():
         'website/vercel/README.md': 'README.md',
         'website/server.py': 'backend/server.py',
         'website/environment_data.py': 'backend/environment_data.py',
+        'website/city_data.py': 'backend/city_data.py',
+        'website/assistant.py': 'backend/assistant.py',
+        'dashboard_data/multi_city_forecast.json': 'dashboard_data/multi_city_forecast.json',
+        'data/city_era5_manifest.csv': 'data/city_era5_manifest.csv',
         'rag/insight_agent.py': 'rag/insight_agent.py',
         'rag/knowledge_chunks.jsonl': 'rag/knowledge_chunks.jsonl',
         'rag/knowledge_manifest.json': 'rag/knowledge_manifest.json',
@@ -48,7 +52,12 @@ def main():
         'modeling/evaluations/model_metrics_20261020T083434210943Z.json': 'modeling/evaluations/model_metrics_20261020T083434210943Z.json',
         'modeling/evaluations/risk_metrics_20261020T092105Z.json': 'modeling/evaluations/risk_metrics_20261020T092105Z.json',
     }
-    for name in ('index.html', 'style.css', 'app.js', 'favicon.svg', 'guidance.json'):
+    for city in server.cities():
+        name = f"modeling/evaluations/{city['id']}_model_metrics.json"
+        if (ROOT / name).is_file():
+            files[name] = name
+    server.export_city_snapshots()
+    for name in ('index.html', 'style.css', 'app.js', 'favicon.svg', 'guidance.json', 'city-snapshots.json'):
         files[f'website/dist/{name}'] = f'public/{name}'
     for source in files:
         if not (ROOT / source).is_file():

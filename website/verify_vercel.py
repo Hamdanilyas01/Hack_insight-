@@ -78,15 +78,35 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(data['forecast']['model_prediction_c'], predicted)
         self.assertEqual(len(data['hourly']), 25)
 
+    def test_city_routes_and_packaged_city_evidence(self):
+        for city in server.cities():
+            result=self.client.get('/api/dashboard',params={'city':city['id']})
+            self.assertEqual(result.status_code,200)
+            data=result.json()
+            self.assertEqual(data['city']['id'],city['id'])
+            if city['id']!='karachi':
+                self.assertFalse(data['forecast']['available'])
+                self.assertEqual(data['air_history']['daily'],[])
+        self.assertEqual(self.client.get('/api/dashboard?city=unknown').status_code,400)
+        self.assertEqual(self.client.post('/api/insight',json={'city':'unknown','question':'Current AQI?'}).status_code,400)
+        saved=self.client.get('/city-snapshots.json')
+        self.assertEqual(saved.status_code,200)
+        self.assertEqual(set(saved.json()),{'karachi','lahore','islamabad','multan'})
+
     def test_real_guidance_retrieval(self):
         for question, citation in [
             ('How should outdoor workers stay safe in the heat?', 'https://www.cdc.gov/niosh/'),
             ('What is heat index and how does humidity affect it?', 'https://www.weather.gov/'),
         ]:
-            result = self.client.post('/api/insight', json={'question':question})
+            def generate(question,history,evidence,*args):
+                ids=[key for key in evidence if key.startswith('guidance:')]
+                self.assertTrue(ids)
+                return {'answer':'The retrieved official guidance explains heat-safety precautions.', 'supported':True,'citation_ids':ids}
+            with patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'generate',side_effect=generate):
+                result = self.client.post('/api/insight', json={'question':question})
             self.assertEqual(result.status_code, 200)
-            self.assertEqual(result.json()['mode'], 'retrieval')
-            self.assertIn(citation, result.json()['answer'])
+            self.assertEqual(result.json()['mode'], 'gemini')
+            self.assertTrue(any(c['url'].startswith(citation) for c in result.json()['citations']))
 
     def test_forecast_freshness_guard_is_preserved(self):
         from datetime import datetime, timedelta, timezone
@@ -101,26 +121,30 @@ class DeploymentTests(unittest.TestCase):
             def execute(self, sql): return Result()
             def close(self): pass
         with patch.object(insight_agent.duckdb, 'connect', return_value=Connection()):
-            result = self.client.post('/api/insight', json={'question':'What is the latest predicted heat index?'})
-        self.assertEqual(result.status_code, 200)
-        self.assertIn('stale', result.json()['answer'])
+            answer=server.get_agent().latest_forecast_answer()
+        self.assertIn('stale',answer)
 
     def test_unsupported_questions_stay_unsupported(self):
         for question in ['How many hospital admissions were there?', 'Who won the football match?']:
-            result = self.client.post('/api/insight', json={'question':question})
+            reply={'answer':'I don’t have evidence for that. I can help with weather, air quality or heat safety.', 'supported':False,'citation_ids':[]}
+            with patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'generate',return_value=reply):
+                result = self.client.post('/api/insight', json={'question':question})
             self.assertEqual(result.status_code, 200)
-            self.assertIn("I don't know", result.json()['answer'])
+            self.assertFalse(result.json()['supported'])
 
     def test_aqi_route_uses_packaged_environmental_reader(self):
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
-        air = {'current':{'us_aqi':93.0,'aqi_category':'Moderate','pm2_5':40.0,'pm10':54.1},
-               'status':'live','valid_at_utc':now,'fetched_at_utc':now}
-        with patch.object(server, 'read_dashboard', return_value={'air_quality':air}):
+        data=server.read_dashboard(live=False)
+        data['air_quality']['current'].update(us_aqi=93.0,aqi_category='Moderate')
+        def generate(question,history,evidence,*args):
+            self.assertEqual(evidence['karachi:air']['latest_conditions']['us_aqi'],93.0)
+            return {'answer':'The current US AQI is 93, in the Moderate band.', 'supported':True,'citation_ids':['karachi:air']}
+        with patch.object(server, 'read_dashboard', return_value=data),patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'generate',side_effect=generate):
             result = self.client.post('/api/insight',json={'question':'What is the current AQI?'})
         self.assertEqual(result.status_code,200)
         self.assertIn('93',result.json()['answer'])
-        self.assertIn('https://open-meteo.com/en/docs/air-quality-api',result.json()['answer'])
+        self.assertEqual(result.json()['citations'][0]['url'],'https://open-meteo.com/en/docs/air-quality-api')
 
     def test_invalid_and_oversized_questions(self):
         for value in ['', None, [], 4, 'x'*1001]:

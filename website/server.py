@@ -7,13 +7,17 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import sys
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from zoneinfo import ZoneInfo
 
 if __package__:
-    from .environment_data import enrich, read_air_history
+    from .environment_data import enrich, read_air_history, timestamp
+    from .city_data import cities, get_city, stored_city_dashboard
+    from . import assistant
 else:
-    from environment_data import enrich, read_air_history
+    from environment_data import enrich, read_air_history, timestamp
+    from city_data import cities, get_city, stored_city_dashboard
+    import assistant
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = Path(__file__).resolve().parent / 'dist'
@@ -43,7 +47,13 @@ def heat_index(t, rh):
         hi += ((rh-85)/10)*((87-f)/5)
     return (hi-32)/1.8
 
-def read_dashboard(live=False):
+def read_dashboard(live=False, city='karachi'):
+    selected = get_city(city)
+    if selected['id'] != 'karachi':
+        data = stored_city_dashboard(selected, heat_index, timestamp)
+        data.update(city=selected, cities=cities(), exported_at=datetime.now(timezone.utc),
+                    sources=json.loads((ROOT / 'rag/source_registry.json').read_text())['sources'])
+        return enrich(data, data.pop('air_history'), heat_index, live=live)
     import duckdb
     connection = duckdb.connect(str(ROOT / 'warehouse/heatsafe_live.duckdb'), read_only=True)
     def query(sql):
@@ -68,7 +78,7 @@ def read_dashboard(live=False):
     current = min(weather, key=lambda row: abs((row['time_utc'] - collected).total_seconds()))
     hours = [row for row in weather if row['time_utc'] >= forecast['issue_time_utc']][:25]
     dashboard = {
-        'mode': 'warehouse', 'exported_at': datetime.now(timezone.utc),
+        'city':selected, 'cities':cities(), 'mode': 'warehouse', 'exported_at': datetime.now(timezone.utc),
         'fresh': valid and 0 <= age <= 10800, 'verified': valid,
         'forecast': forecast, 'freshness': freshness, 'current': current, 'hourly': hours,
         'metrics': json.loads((ROOT / 'modeling/evaluations/model_metrics_20261020T083434210943Z.json').read_text()),
@@ -83,26 +93,35 @@ def get_agent():
     return HeatSafeInsightAgent()
 
 
-def answer_insight(question):
+def answer_insight(question, city='karachi'):
     """Extend the existing cited safety agent with clearly sourced environmental data."""
     import re
+    selected = get_city(city)
     q = question.casefold()
     if re.search(r'\b(?:death\w*|hospital\w*|admission\w*|injur\w*|patient\w*)\b', q):
         return get_agent().answer(question)
+    if (selected['id'] != 'karachi'
+            and re.search(r'\b(?:latest|current|forecast|predicted|prediction|today|tomorrow)\b', q)
+            and any(term in q for term in ['heat index', 'heat forecast', 'heat risk', 'heat level'])
+            and not re.search(r'\b(?:safe|safety|protect|prevent|precaution)\b', q)
+            and re.search(r'\b(?:forecast|predicted|prediction|tomorrow|model)\b', q)):
+        return (f"No stored live HeatSafe ML prediction is bundled for {selected['name']}. "
+                'Open Forecast for the city-specific provider weather outlook and calculated heat index. '
+                'Karachi’s stored ML result is not used for other cities.')
     if re.search(r'\b(?:pipeline|prefect|update frequency)\b', q) or 'how often' in q and 'update' in q:
         return ('The original Prefect pipeline is not running on Vercel. The open website checks its API every 5 minutes. '
                 'Each Python instance caches weather and AQI source responses for 15 minutes; cold starts can fetch sooner. '
                 'No requests means no background refresh. DuckDB is read-only and its stored ML result only changes when '
                 'you rebuild and redeploy an updated database. This is request-driven API access, not scheduled ML inference.')
     if re.search(r'\b(?:aqi|air quality|pm2[._]?5|pm10|pollution|ozone|nitrogen dioxide)\b', q):
-        air = read_dashboard(live=True)['air_quality']
+        air = (read_dashboard(live=True) if selected['id']=='karachi' else read_dashboard(live=True, city=selected['id']))['air_quality']
         current = air['current']
         if current.get('us_aqi') is None:
             return ('Current AQI is unavailable from the live source. The project contains historical pollutant concentrations, '
                     'which must not be presented as today’s AQI. Explore Air quality to see the dated history.\n\n'
                     'Source: https://open-meteo.com/en/docs/air-quality-api')
         label = 'US AQI' if air['status'] == 'live' else 'Last available US AQI (may be outdated)'
-        return (f"{label}: {current['us_aqi']:.0f} — {current['aqi_category']}\n"
+        return (f"{selected['name']} · {label}: {current['us_aqi']:.0f} — {current['aqi_category']}\n"
                 f"PM2.5: {current.get('pm2_5') if current.get('pm2_5') is not None else 'unavailable'} µg/m³\n"
                 f"PM10: {current.get('pm10') if current.get('pm10') is not None else 'unavailable'} µg/m³\n"
                 f"Valid time: {display_time_pk(air['valid_at_utc'])}\n"
@@ -113,12 +132,12 @@ def answer_insight(question):
             and re.search(r'\b(?:weather|temperature|humidity|wind|heat index)\b',q)
             and not re.search(r'\b(?:safe|safety|protect|prevent|precaution)\b',q)
             and not re.search(r'\b(?:forecast|predicted|prediction|tomorrow)\b',q)):
-        weather = read_dashboard(live=True)['weather']
+        weather = (read_dashboard(live=True) if selected['id']=='karachi' else read_dashboard(live=True, city=selected['id']))['weather']
         row = weather['current']
         def display(key):
             value = row.get(key)
             return f'{value:.1f}' if isinstance(value,(int,float)) else 'unavailable'
-        return (f"Latest available modeled weather for Karachi ({weather['status']}):\n"
+        return (f"Latest available modeled weather for {selected['name']} ({weather['status']}):\n"
                 f"Air temperature: {display('temperature_c')} °C\n"
                 f"Calculated heat index: {display('heat_index_c')} °C\n"
                 f"Relative humidity: {display('humidity_pct')} %\n"
@@ -127,13 +146,24 @@ def answer_insight(question):
                 f"Last source pull: {display_time_pk(weather['fetched_at_utc'])}\n"
                 'These are modeled conditions, not on-site sensor measurements.\n\n'
                 'Source: https://open-meteo.com/en/docs')
+    if (selected['id'] != 'karachi'
+            and re.search(r'\b(?:latest|current|forecast|predicted|prediction|today|tomorrow)\b', q)
+            and any(term in q for term in ['heat index', 'heat forecast', 'heat risk'])):
+        return f"No stored live HeatSafe ML prediction is bundled for {selected['name']}. Explore this city’s provider outlook in Forecast."
     return get_agent().answer(question)
+
+def answer_chat(question, city='karachi', history=None, date_from='', date_to=''):
+    selected = get_city(city)
+    return assistant.answer(question, selected['id'], history, date_from, date_to,
+                            read_dashboard, get_agent, cities)
+
 
 def export():
     WEB.mkdir(parents=True, exist_ok=True)
     data = read_dashboard(live=True)
     data['mode'] = 'snapshot'
     (WEB / 'snapshot.json').write_text(json.dumps(data, default=json_default, indent=2), encoding='utf-8')
+    export_city_snapshots()
     questions = {
         'safety': 'How can outdoor workers stay safe in the heat?',
         'hydration': 'How should workers hydrate and drink water in heat?',
@@ -144,6 +174,14 @@ def export():
     answers = {key: get_agent().answer(question) for key, question in questions.items()}
     (WEB / 'guidance.json').write_text(json.dumps(answers, indent=2), encoding='utf-8')
     print('Exported verified warehouse snapshot and existing agent guidance.')
+
+def export_city_snapshots():
+    saved = {}
+    for city in cities():
+        saved[city['id']] = read_dashboard(live=False, city=city['id'])
+        saved[city['id']]['mode'] = 'snapshot'
+    (WEB / 'city-snapshots.json').write_text(json.dumps(saved, default=json_default), encoding='utf-8')
+
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -162,7 +200,10 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == '/api/dashboard':
             try:
-                self.send_json(200, read_dashboard(live=True))
+                city = parse_qs(urlparse(self.path).query).get('city', ['karachi'])[0]
+                self.send_json(200, read_dashboard(live=True, city=city))
+            except ValueError as error:
+                self.send_json(400, {'error':str(error)})
             except Exception as error:
                 print(f'Dashboard unavailable: {error}', file=sys.stderr)
                 self.send_json(503, {'error': 'Warehouse unavailable. The saved snapshot can still be explored.'})
@@ -188,7 +229,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(question, str) or not question.strip() or len(question) > 1000:
                 self.send_json(400, {'error': 'Enter a question between 1 and 1,000 characters.'})
                 return
-            self.send_json(200, {'answer': answer_insight(question), 'mode': 'retrieval'})
+            self.send_json(200, answer_chat(question, city=body.get('city','karachi'), history=body.get('history'), date_from=body.get('date_from',''), date_to=body.get('date_to','')))
         except (ValueError, json.JSONDecodeError):
             self.send_json(400, {'error': 'Invalid question JSON.'})
         except Exception as error:

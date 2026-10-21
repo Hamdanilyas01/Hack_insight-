@@ -80,8 +80,9 @@ def get_json(url):
     return data
 
 
-def request_url(kind):
-    params = {'latitude':24.8607, 'longitude':67.0011, 'timezone':'GMT', 'timeformat':'unixtime', 'forecast_days':3, 'past_hours':12}
+def request_url(kind, city=None):
+    city = city or {'id':'karachi', 'latitude':24.8607, 'longitude':67.0011}
+    params = {'latitude':city['latitude'], 'longitude':city['longitude'], 'timezone':'GMT', 'timeformat':'unixtime', 'forecast_days':3, 'past_hours':12}
     if kind == 'weather':
         params.update({
             'current':'temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,weather_code,is_day',
@@ -174,10 +175,11 @@ def parse_feed(payload, kind, heat_index):
     return result
 
 
-def cached_feed(kind, heat_index):
+def cached_feed(kind, heat_index, city=None):
+    key = kind if not city or city['id']=='karachi' else (kind, city['id'])
     with _locks[kind]:
         now = time.monotonic()
-        entry = _cache.get(kind)
+        entry = _cache.get(key)
         if entry and now < entry['retry_at']:
             result = deepcopy(entry['data']) if entry.get('data') else None
             if result:
@@ -189,12 +191,12 @@ def cached_feed(kind, heat_index):
                     result['status'] = 'stale'
             return result
         try:
-            result = parse_feed(get_json(request_url(kind)), kind, heat_index)
-            _cache[kind] = {'data':deepcopy(result), 'retry_at':time.monotonic()+CACHE_SECONDS, 'failed':False}
+            result = parse_feed(get_json(request_url(kind, city)), kind, heat_index)
+            _cache[key] = {'data':deepcopy(result), 'retry_at':time.monotonic()+CACHE_SECONDS, 'failed':False}
             return result
         except Exception:
             previous = entry.get('data') if entry else None
-            _cache[kind] = {'data':previous, 'retry_at':time.monotonic()+60, 'failed':True}
+            _cache[key] = {'data':previous, 'retry_at':time.monotonic()+60, 'failed':True}
             if previous:
                 result = deepcopy(previous)
                 result.update(status='cached_stale', cache_hit=True, note='Latest refresh failed. Showing the last successful API response.')
@@ -253,8 +255,8 @@ def enrich(data, historical_air, heat_index, live=False):
     }
     if live and os.getenv('HEATSAFE_DISABLE_LIVE') != '1':
         with ThreadPoolExecutor(max_workers=2) as pool:
-            weather_future = pool.submit(cached_feed, 'weather', heat_index)
-            air_future = pool.submit(cached_feed, 'air', heat_index)
+            weather_future = pool.submit(cached_feed, 'weather', heat_index, data.get('city'))
+            air_future = pool.submit(cached_feed, 'air', heat_index, data.get('city'))
             weather = weather_future.result() or weather
             air = air_future.result() or air
     data.update({
@@ -284,28 +286,31 @@ def build_network(data):
                       'parent':parent})
         if parent:
             links.append({'source':parent, 'target':id})
-    add('karachi','location','Karachi', 'Pakistan', note='Weather, air quality and project evidence in one connected view.')
-    add('weather','weather','Weather', parent='karachi', source=weather['source'], when=weather['valid_at_utc'], status=weather['status'], view='forecast')
+    city = data.get('city', {'id':'karachi','name':'Karachi'})
+    root = city['id']
+    add(root,'location',city['name'], 'Pakistan', note='Weather, air quality and project evidence in one connected view.')
+    add('weather','weather','Weather', parent=root, source=weather['source'], when=weather['valid_at_utc'], status=weather['status'], view='forecast')
     for id,key,label,unit in [('temperature','temperature_c','Temperature','°C'),('heatindex','heat_index_c','Feels like · heat index','°C'),('humidity','humidity_pct','Humidity','%'),('wind','wind_speed_ms','Wind speed','m/s')]:
         value = weather['current'].get(key)
         if value is not None:
             add(id,'weather',label,value,unit,'weather',weather['source'],weather['valid_at_utc'],
                 'Heat index is calculated from air temperature and humidity.' if id=='heatindex' else weather['note'], weather['status'],'forecast')
-    add('air','air','Air quality', parent='karachi', source=air['source'], when=air['valid_at_utc'], status=air['status'], view='air')
+    add('air','air','Air quality', parent=root, source=air['source'], when=air['valid_at_utc'], status=air['status'], view='air')
     for id,key,label,unit in [('aqi','us_aqi','US AQI',''),('pm25','pm2_5','PM2.5','µg/m³'),('pm10','pm10','PM10','µg/m³'),('no2','nitrogen_dioxide','Nitrogen dioxide','µg/m³'),('ozone','ozone','Ozone','µg/m³')]:
         value = air['current'].get(key)
         if value is not None:
             add(id,'air',label,value,unit,'air',air['source'],air['valid_at_utc'],air['current'].get('aqi_category') if id=='aqi' else air['note'],air['status'],'air')
-    add('forecast','forecast','Stored ML forecast',forecast.get('model_prediction_c'),'°C','karachi','DuckDB · trained heat-index model',forecast['target_time_utc'],
-        'A single 24-hour ML prediction from the stored pipeline. This is separate from the live formula forecast.', 'verified' if data['fresh'] else 'stale','forecast')
-    for id,key,label in [('lower','interval_lower_c','Interval lower bound'),('upper','interval_upper_c','Interval upper bound')]:
-        if forecast.get(key) is not None:
-            add(id,'forecast',label,forecast[key],'°C','forecast','Historical interval calibration',forecast['target_time_utc'],'Historical calibration is not a guarantee of live coverage.','available','forecast')
-    add('evidence','evidence','Model evidence',parent='karachi',source='Held-out test evaluation',view='evidence')
+    if forecast.get('available', True):
+        add('forecast','forecast','Stored ML forecast',forecast.get('model_prediction_c'),'°C',root,'DuckDB · trained heat-index model',forecast['target_time_utc'],
+            'A single 24-hour ML prediction from the stored pipeline. This is separate from the live formula forecast.', 'verified' if data['fresh'] else 'stale','forecast')
+        for id,key,label in [('lower','interval_lower_c','Interval lower bound'),('upper','interval_upper_c','Interval upper bound')]:
+            if forecast.get(key) is not None:
+                add(id,'forecast',label,forecast[key],'°C','forecast','Historical interval calibration',forecast['target_time_utc'],'Historical calibration is not a guarantee of live coverage.','available','forecast')
+    add('evidence','evidence','Model evidence',parent=root,source='Held-out test evaluation',view='evidence')
     for id,key,label,unit in [('mae','test_model_mae_c','Model test error','°C'),('r2','test_model_r2','Model test R²','')]:
         if metrics.get(key) is not None:
             add(id,'evidence',label,metrics[key],unit,'evidence','Project evaluation files',note='Historical test-set performance; not a live weather reading.',view='evidence')
-    add('safety','safety','Safety guidance',len(data['sources']),'sources','karachi','Verified retrieval index',note='Select a source or ask a heat-safety question.',view='evidence')
+    add('safety','safety','Safety guidance',len(data['sources']),'sources',root,'Verified retrieval index',note='Select a source or ask a heat-safety question.',view='evidence')
     for source in data['sources']:
         label = source['publisher'].replace('UK Health and Safety Executive','UK HSE').replace('NOAA National Weather Service','NOAA NWS')
         add(source['source_id'],'safety',label,parent='safety',source=source['url'],note=source['title'],view='evidence')

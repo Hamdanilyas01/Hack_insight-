@@ -14,7 +14,7 @@ python website/server.py
 
 Open http://127.0.0.1:8000. Change the port with `--port 8080`.
 
-The local API reads `warehouse/heatsafe_live.duckdb` without modifying it. `/api/dashboard` combines the archived gold ML result, historical CAMS pollutant data, and live Open-Meteo weather/AQI responses. `/api/insight` extends `rag.insight_agent.HeatSafeInsightAgent` with cited environmental API answers while retaining the original safety retrieval and ML freshness checks. No model retraining or Prefect pipeline execution is triggered by the website.
+The local API reads `warehouse/heatsafe_live.duckdb` without modifying it. `/api/dashboard` combines the archived gold ML result, historical CAMS pollutant data, and live Open-Meteo weather/AQI responses. `/api/insight` uses server-side Gemini 3.5 Flash-Lite to explain current city weather/AQI, available history, model results, evaluations, and retrieved safety passages. It returns natural-language answers, source references, freshness context, and friendly fallbacks. No model retraining or Prefect pipeline execution is triggered by the website.
 
 ## Refresh behavior and data meaning
 
@@ -87,8 +87,12 @@ No JavaScript dependency install or build step is required.
 ## Exploring the updated dashboard
 
 - Overview is a full-width city summary combining weather and air outlooks. The top panel is explicitly labeled City now; its values and the central weather display remain the latest source conditions.
-- Use From / To and Apply for inclusive Karachi calendar dates. Reset returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
+- Choose Last 7 days, Last 30 days, Last 6 months, or Custom range with sliders and precise date inputs. Reset to outlook returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
 - Forecast has the only temperature/heat-index line chart, with a vertical model-valid boundary, shaded future region, dashed prediction lines, event pins and a visual hourly planning strip. Recent values are model estimates, not observed sensor measurements. The separate stored ML point is never presented as a continuously rerun prediction.
 - Air quality has AQI, particle concentrations and a historical archive. Custom archive dates use daily means grouped by Karachi day; the default longer view uses the latest 12 monthly means. Animated dots are illustrative, not measurements. PM10 includes PM2.5; the values must not be added.
 - Each tab changes the KPI panel. Selecting a network node highlights its direct incoming/outgoing links. Close the detail panel to clear the highlight. Animations respect reduced-motion preferences.
 - The date selector filters available records; it does not trigger historical API backfills or change the read-only database/update schedule. Live responses include up to 12 recent model hours plus the future outlook.
+
+## Gemini setup
+
+The original local project loads `GEMINI_API_KEY` and `HEATSAFE_GEMINI_MODEL` from the ignored project-root `.env.local`, or process environment variables. Model: `gemini-3.5-flash-lite`. In Vercel, add those variables under Project Settings → Environment Variables and redeploy. Keys are excluded from frontend files and deployment packages. See `website/vercel/README.md` for configuration details. The assistant uses `/api/insight`; the original deterministic retrieval agent remains available for exports and compatibility.

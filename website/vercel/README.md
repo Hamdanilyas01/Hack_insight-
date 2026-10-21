@@ -51,6 +51,34 @@ npx vercel@latest --prod
 
 Select your existing Vercel project when linking. A continuously updating cloud warehouse requires an additional ingestion/storage design; it is not enabled by this package.
 
+## Gemini assistant configuration
+
+In Vercel, open Project Settings → Environment Variables and add `GEMINI_API_KEY`
+with your Google AI Studio key. Set `HEATSAFE_GEMINI_MODEL` to
+`gemini-3.5-flash-lite`, then redeploy. The secret is deliberately excluded from
+the upload folder and ZIP. It must never be added to public JavaScript or JSON.
+
+For local development, place those two variables in the project-root `.env.local`
+(which Git ignores), or set them in the process environment. The original project
+has already been configured locally. A separately extracted package needs its own
+environment variables or its own root `.env.local`.
+
+The website's `/api/insight` now uses server-side Gemini generation, grounded in
+the selected city's current/recent/forecast weather, AQI and pollutant values,
+available particulate history, saved ML result with freshness and target date,
+model evaluation, pipeline metadata, and retrieved official safety passages.
+Recent chat messages and the selected date range support follow-up questions.
+Questions naming other supported cities can retrieve their evidence for comparison.
+Answers include validated source references. Missing evidence, provider outages,
+quota limits and missing configuration produce friendly responses.
+
+Date controls now provide Last 7 days, Last 30 days, Last 6 months and Custom range
+cards. Custom range has two day sliders plus precise date inputs. Presets use
+actual Pakistan calendar dates; they filter available records and do not backfill
+missing history. Reset to outlook restores the existing 24/48-hour forecast.
+
+Model documentation: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
+
 ## Local check of this exact package
 
 With Python 3.12, install `requirements.txt`, then run from this folder:
@@ -64,7 +92,7 @@ Open http://127.0.0.1:8000 and http://127.0.0.1:8000/api/health.
 ## Exploring the updated dashboard
 
 - Overview is a full-width city summary combining weather and air outlooks. The top panel is explicitly labeled City now; its values and the central weather display remain the latest source conditions.
-- Use From / To and Apply for inclusive Karachi calendar dates. Reset returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
+- Choose a preset card or Custom range for sliders and precise date inputs. Reset to outlook returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
 - Forecast has the only temperature/heat-index line chart, with a vertical model-valid boundary, shaded future region, dashed prediction lines, event pins and a visual hourly planning strip. Recent values are model estimates, not observed sensor measurements. The separate stored ML point is never presented as a continuously rerun prediction.
 - Air quality has AQI, particle concentrations and a historical archive. Custom archive dates use daily means grouped by Karachi day; the default longer view uses the latest 12 monthly means. Animated dots are illustrative, not measurements. PM10 includes PM2.5; the values must not be added.
 - Each tab changes the KPI panel. Selecting a network node highlights its direct incoming/outgoing links. Close the detail panel to clear the highlight. Animations respect reduced-motion preferences.

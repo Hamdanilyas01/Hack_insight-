@@ -10,12 +10,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 
-from backend.server import get_agent, read_dashboard, answer_insight
+from backend.server import get_agent, read_dashboard, answer_chat, assistant
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / 'public'
 STATIC_FILES = frozenset({
-    'index.html', 'style.css', 'app.js', 'favicon.svg', 'snapshot.json', 'guidance.json'
+    'index.html', 'style.css', 'app.js', 'favicon.svg', 'snapshot.json', 'guidance.json', 'city-snapshots.json'
 })
 agent_lock = Lock()
 logger = logging.getLogger('heatsafe')
@@ -48,7 +48,7 @@ def health():
             'status': 'ok', 'backend': 'python-fastapi', 'storage': storage_info(),
             'forecast_collected_at': data['freshness']['collected_at_utc'],
             'forecast_fresh': data['fresh'], 'forecast_verified': data['verified'],
-            'retrieval': {'status': 'ready', 'knowledge_chunks': chunks, 'generative_model': False},
+            'retrieval': {'status': 'ready', 'knowledge_chunks': chunks, 'generative_model': assistant.configuration_status()['configured'], 'model':assistant.configuration_status()['model']},
             'updates': {'mode':'request-driven', 'browser_poll_seconds':300, 'source_cache_seconds':900,
                         'scheduled_prefect':False, 'database_writable':False},
         })
@@ -58,11 +58,13 @@ def health():
 
 
 @app.get('/api/dashboard')
-def dashboard():
+def dashboard(city: str = 'karachi'):
     try:
-        data = read_dashboard(live=True)
+        data = read_dashboard(live=True, city=city)
         data['storage'] = storage_info()
         return response(data)
+    except ValueError as error:
+        return response({'error':str(error)}, 400)
     except Exception:
         logger.exception('Dashboard evidence could not be read')
         return response({'error': 'Warehouse unavailable. The saved snapshot can still be explored.'}, 503)
@@ -96,16 +98,17 @@ async def insight(request: Request):
     try:
         # Scientific retrieval and DuckDB are synchronous. Keep them off the ASGI loop.
         from starlette.concurrency import run_in_threadpool
-        result = await run_in_threadpool(answer_question, question.strip())
-        return response({'answer': result, 'mode': 'retrieval', 'storage': storage_info()})
+        result = await run_in_threadpool(answer_question, question.strip(), payload.get('city','karachi'), payload.get('history'), payload.get('date_from',''), payload.get('date_to',''))
+        return response({**result, 'storage': storage_info()})
+    except ValueError as error:
+        return response({'error':str(error)}, 400)
     except Exception:
         logger.exception('Retrieval failed')
         return response({'error': 'The retrieval assistant is unavailable. Try again or read the official evidence sources.'}, 503)
 
 
-def answer_question(question):
-    with agent_lock:
-        return answer_insight(question)
+def answer_question(question, city='karachi', history=None, date_from='', date_to=''):
+    return answer_chat(question, city=city, history=history, date_from=date_from, date_to=date_to)
 
 
 @app.get('/', include_in_schema=False)
