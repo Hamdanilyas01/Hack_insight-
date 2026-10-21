@@ -98,15 +98,20 @@ class DeploymentTests(unittest.TestCase):
             ('How should outdoor workers stay safe in the heat?', 'https://www.cdc.gov/niosh/'),
             ('What is heat index and how does humidity affect it?', 'https://www.weather.gov/'),
         ]:
-            def generate(question,history,evidence,*args):
-                ids=[key for key in evidence if key.startswith('guidance:')]
+            def generate(question,history,tools,*args):
+                result=tools.execute('search_safety_guidance',{'query':question})
+                ids=[p['source_id'] for p in result['passages']]
                 self.assertTrue(ids)
                 return {'answer':'The retrieved official guidance explains heat-safety precautions.', 'supported':True,'citation_ids':ids}
             with patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'generate',side_effect=generate):
                 result = self.client.post('/api/insight', json={'question':question})
             self.assertEqual(result.status_code, 200)
             self.assertEqual(result.json()['mode'], 'gemini')
-            self.assertTrue(any(c['url'].startswith(citation) for c in result.json()['citations']))
+            # The compact retriever returns the two best passages, which may come
+            # from a different official publisher than the old six-passage prompt.
+            official_urls={c['source_url'] for c in server.get_agent().chunks}
+            cited_urls={c['url'] for c in result.json()['citations']}
+            self.assertTrue(cited_urls and cited_urls <= official_urls)
 
     def test_forecast_freshness_guard_is_preserved(self):
         from datetime import datetime, timedelta, timezone
@@ -137,14 +142,33 @@ class DeploymentTests(unittest.TestCase):
         now = datetime.now(timezone.utc)
         data=server.read_dashboard(live=False)
         data['air_quality']['current'].update(us_aqi=93.0,aqi_category='Moderate')
-        def generate(question,history,evidence,*args):
-            self.assertEqual(evidence['karachi:air']['latest_conditions']['us_aqi'],93.0)
-            return {'answer':'The current US AQI is 93, in the Moderate band.', 'supported':True,'citation_ids':['karachi:air']}
+        def generate(question,history,tools,*args):
+            lookup=tools.execute('lookup_environment',{'period':'current','metrics':['us_aqi']})
+            self.assertEqual(lookup['data']['metrics']['us_aqi']['value'],93.0)
+            return {'answer':'The current US AQI is 93, in the Moderate band.', 'supported':True,'citation_ids':[lookup['source_id']]}
         with patch.object(server, 'read_dashboard', return_value=data),patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'generate',side_effect=generate):
             result = self.client.post('/api/insight',json={'question':'What is the current AQI?'})
         self.assertEqual(result.status_code,200)
         self.assertIn('93',result.json()['answer'])
         self.assertEqual(result.json()['citations'][0]['url'],'https://open-meteo.com/en/docs/air-quality-api')
+
+    def test_native_history_tool_queries_the_bundled_database(self):
+        from backend import assistant_tools
+        self.assertEqual(assistant_tools.ROOT,BUNDLE)
+        id='karachi:history:2025-09-23:2025-09-23'
+        first={'candidates':[{'finishReason':'STOP','content':{'role':'model','parts':[{
+            'functionCall':{'name':'lookup_environment','args':{'period':'history','metrics':['temperature_c'],'start_date':'2025-09-23'}}}]}}],
+            'usageMetadata':{'promptTokenCount':800,'candidatesTokenCount':30,'totalTokenCount':830}}
+        second={'candidates':[{'finishReason':'STOP','content':{'role':'model','parts':[{'text':json.dumps({
+            'answer':'The requested day has 24 hourly temperature readings.','supported':True,'citation_ids':[id]})}]}}],
+            'usageMetadata':{'promptTokenCount':1000,'candidatesTokenCount':80,'totalTokenCount':1080}}
+        with patch.object(server.assistant,'settings',return_value=('test-key','gemini-3.5-flash-lite')),patch.object(server.assistant,'request_model',side_effect=[first,second]) as model:
+            result=self.client.post('/api/insight',json={'question':'What was the temperature on 23 September 2025?'})
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json()['mode'],'gemini')
+        self.assertEqual(result.json()['usage']['total_tokens'],1910)
+        lookup=model.call_args_list[-1].args[0]['contents'][-1]['parts'][0]['functionResponse']['response']
+        self.assertEqual(lookup['data']['metrics']['temperature_c']['records'],24)
 
     def test_invalid_and_oversized_questions(self):
         for value in ['', None, [], 4, 'x'*1001]:

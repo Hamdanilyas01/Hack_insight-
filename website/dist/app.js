@@ -1,7 +1,7 @@
 'use strict';
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const NS='http://www.w3.org/2000/svg';
-const state={data:null,city:'karachi',api:false,view:'overview',unit:'C',hours:24,dateFrom:'',dateTo:'',datePreset:'outlook',chatHistory:[],selected:null,filter:null,zoom:1,pan:{x:0,y:0},orbit:false,paused:typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,loading:false};
+const state={data:null,city:'karachi',api:false,view:'overview',unit:'C',hours:24,dateFrom:'',dateTo:'',datePreset:'outlook',filterAt:Date.now(),calendarMonth:'',draftStart:'',draftEnd:'',chatHistory:[],selected:null,filter:null,zoom:1,pan:{x:0,y:0},orbit:false,paused:typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,loading:false};
 const labels={weather:'Weather',air:'Air quality',forecast:'Stored ML forecast',evidence:'Model evidence',safety:'Safety guidance'};
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const fmt=(v,d=1)=>finite(v)?v.toFixed(d):'—';
@@ -20,33 +20,56 @@ function segments(rows,key,transform=v=>v){const out=[];let part=[];for(const ro
 
 function calendarDay(value){const t=new Date(value).getTime();return Number.isFinite(t)?new Date(t+5*3600000).toISOString().slice(0,10):'';}
 function filterDates(rows,from='',to=''){return (rows||[]).filter(r=>{const d=calendarDay(r.time_utc);return d&&(!from||d>=from)&&(!to||d<=to);});}
-function selectedRows(rows){return state.dateFrom||state.dateTo?filterDates(rows,state.dateFrom,state.dateTo):rowsForWindow(rows,state.hours);}
+function rollingRows(rows,now=Date.now()){return (rows||[]).filter(r=>{const t=new Date(r.time_utc).getTime();return t>=now-12*3600000&&t<=now;});}
+function periodRows(rows){return state.datePreset==='12h'?rollingRows(rows,state.filterAt):filterDates(rows,state.dateFrom,state.dateTo);}
+function selectedRows(rows){if(state.datePreset==='12h'){const feed=state.data&&[state.data.weather,state.data.air_quality].find(f=>f.hourly===rows);return rollingRows([...(feed?.recent_hourly||[]),...(rows||[])],state.filterAt).filter((r,i,all)=>all.findIndex(v=>new Date(v.time_utc).getTime()===new Date(r.time_utc).getTime())===i);}return state.dateFrom||state.dateTo?filterDates(rows,state.dateFrom,state.dateTo):rowsForWindow(rows,state.hours);}
 function extreme(rows,key,max=true){return (rows||[]).filter(r=>finite(r[key])).reduce((best,r)=>!best||(max?r[key]>best[key]:r[key]<best[key])?r:best,null);}
 function connectedLinks(links,id){return links.filter(l=>l.source===id||l.target===id);}
 function forecastRows(weather){const boundary=weather.forecast_start_utc||weather.valid_at_utc;const t=new Date(boundary).getTime();const recent=(weather.recent_hourly||[]).filter(r=>new Date(r.time_utc).getTime()<t);const future=(weather.hourly||[]).filter(r=>new Date(r.time_utc).getTime()>t);const current={...weather.current,time_utc:boundary};return [...recent,current,...future].sort((a,b)=>new Date(a.time_utc)-new Date(b.time_utc));}
 
+
 function presetDates(preset,now=new Date()){
- const to=calendarDay(now),end=new Date(to+'T00:00:00Z'),start=new Date(end);
- if(preset==='7'||preset==='30')start.setUTCDate(start.getUTCDate()-Number(preset)+1);
- else if(preset==='6m'){const day=start.getUTCDate();start.setUTCDate(1);start.setUTCMonth(start.getUTCMonth()-6);const last=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+1,0)).getUTCDate();start.setUTCDate(Math.min(day,last));start.setUTCDate(start.getUTCDate()+1);}
- else return {from:'',to:''};
+ if(preset==='12h')return {from:calendarDay(new Date(now.getTime()-12*3600000)),to:calendarDay(now)};
+ const to=calendarDay(now),start=new Date(to+'T00:00:00Z');
+ if(preset==='7'||preset==='30')start.setUTCDate(start.getUTCDate()-Number(preset)+1);else return {from:'',to:''};
  return {from:start.toISOString().slice(0,10),to};
 }
 function dayNumber(value){return Math.round(new Date(value+'T00:00:00Z').getTime()/86400000);}
 function dayString(value){return new Date(Number(value)*86400000).toISOString().slice(0,10);}
-function setDates(from,to,preset='custom'){state.dateFrom=from;state.dateTo=to;state.datePreset=preset;$('#date-from').value=from;$('#date-to').value=to;render();}
+function calendarCells(month){const first=new Date(month+'T00:00:00Z'),offset=(first.getUTCDay()+6)%7,start=dayNumber(month)-offset;return Array.from({length:42},(_,i)=>dayString(start+i));}
+function pickRange(start,end,value){if(!start||end)return {start:value,end:''};return value<start?{start:value,end:start}:{start,end:value};}
+function dateLabel(value){return new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T00:00:00Z'));}
+function setDates(from,to,preset='custom'){state.dateFrom=from;state.dateTo=to;state.datePreset=preset;state.filterAt=Date.now();closeCalendar(false);render();}
 function refreshCalendar(){
- const d=state.data,rows=[...(d.weather.recent_hourly||[]),...d.weather.hourly,...d.air_quality.hourly,...(d.air_history.daily||d.air_history.monthly)],days=rows.map(r=>calendarDay(r.time_utc)).filter(Boolean).sort(),today=calendarDay(new Date()),six=presetDates('6m').from;
- const min=[days[0]||today,six,state.dateFrom||today].sort()[0],max=[days.at(-1)||today,today,state.dateTo||today].sort().at(-1);
- for(const [id,value] of [['range-start',state.dateFrom||today],['range-end',state.dateTo||max]]){const input=$('#'+id);input.min=dayNumber(min);input.max=dayNumber(max);input.value=dayNumber(value);input.setAttribute('aria-valuetext',value);}
- $('#range-caption').textContent=(state.dateFrom||today)+' → '+(state.dateTo||max)+' · PKT';
- $('#custom-range').hidden=state.datePreset!=='custom';
+ const d=state.data,rows=[...(d.weather.recent_hourly||[]),...d.weather.hourly,...(d.air_quality.recent_hourly||[]),...d.air_quality.hourly,...(d.air_history.daily||d.air_history.monthly)],days=rows.map(r=>calendarDay(r.time_utc)).filter(Boolean).sort();
  $$('[data-date-preset]').forEach(b=>{const active=b.dataset.datePreset===state.datePreset;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
- const selected=filterDates(rows,state.dateFrom,state.dateTo);
- $('#date-status').textContent=(state.dateFrom||state.dateTo?`Selected: ${state.dateFrom||'earliest'} → ${state.dateTo||'latest'} · ${selected.length?'available records only':'no records in this range'}. `:'')+`Data available: ${days[0]||'—'} → ${days.at(-1)||'—'} · gaps may exist.`;
+ const selected=periodRows(rows),label=state.datePreset==='12h'?'Last 12 hours':state.dateFrom?dateLabel(state.dateFrom)+' – '+dateLabel(state.dateTo):'Next '+state.hours+' hours';
+ $('#date-status').textContent=label+(state.dateFrom&&!selected.length?' · No data':'')+' · PKT';
+ $('#date-status').title=`Data available: ${days[0]||'—'} → ${days.at(-1)||'—'}. Only available records are shown; gaps may exist.`;
  $('#date-slicer').hidden=['network','evidence'].includes(state.view);
 }
-function periodNote(){return state.dateFrom||state.dateTo?'Selected dates · PKT':'Next '+state.hours+' hours';}
+function closeCalendar(focus=true){$('#range-calendar').hidden=true;$('#custom-date-button').setAttribute('aria-expanded','false');if(focus)$('#custom-date-button').focus();}
+function openCalendar(){
+ if(!$('#range-calendar').hidden){closeCalendar();return;}
+ state.draftStart=state.dateFrom;state.draftEnd=state.dateTo;state.calendarMonth=(state.dateFrom||calendarDay(new Date())).slice(0,7)+'-01';
+ $('#range-calendar').hidden=false;$('#custom-date-button').setAttribute('aria-expanded','true');renderCalendar();
+ const focus=$('[data-calendar-date="'+(state.draftStart||calendarDay(new Date()))+'"]');focus?.focus();
+}
+function moveCalendar(amount){const month=new Date(state.calendarMonth+'T00:00:00Z');month.setUTCMonth(month.getUTCMonth()+amount);state.calendarMonth=month.toISOString().slice(0,10);renderCalendar();}
+function renderCalendar(){
+ const month=new Date(state.calendarMonth+'T00:00:00Z'),year=month.getUTCFullYear(),today=calendarDay(new Date()),start=state.draftStart,end=state.draftEnd;
+ const names=Array.from({length:12},(_,i)=>new Intl.DateTimeFormat('en-GB',{month:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2020,i,1))));
+ const years=Array.from({length:Math.max(7,year-2019)},(_,i)=>2020+i);if(!years.includes(year))years.push(year);
+ $('#calendar-heading').innerHTML=`<select id="calendar-month" aria-label="Calendar month">${names.map((n,i)=>`<option value="${i}" ${i===month.getUTCMonth()?'selected':''}>${n}</option>`).join('')}</select><select id="calendar-year" aria-label="Calendar year">${years.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select>`;
+ const cells=calendarCells(state.calendarMonth);
+ $('#calendar-days').innerHTML=Array.from({length:6},(_,r)=>'<tr>'+cells.slice(r*7,r*7+7).map(value=>`<td class="${start&&end&&value>=start&&value<=end?'in-range':''}"><button type="button" data-calendar-date="${value}" class="${value.slice(0,7)!==state.calendarMonth.slice(0,7)?'other-month ':''}${value===start?'range-start ':''}${value===end?'range-end ':''}${value===today?'today':''}" aria-label="${dateLabel(value)}" aria-pressed="${value===start||value===end}" ${value===today?'aria-current="date"':''}>${Number(value.slice(8))}</button></td>`).join('')+'</tr>').join('');
+ $('#calendar-hint').textContent=start&&!end?'Now choose the end date.':'Choose a start date, then an end date.';
+ $('#calendar-selection').textContent=start?(dateLabel(start)+(end?' – '+dateLabel(end):' → …')):'No range selected';
+ $('#calendar-apply').disabled=!start||!end;
+ for(const id of ['calendar-month','calendar-year'])$('#'+id).addEventListener('change',()=>{state.calendarMonth=String($('#calendar-year').value)+'-'+String(Number($('#calendar-month').value)+1).padStart(2,'0')+'-01';renderCalendar();});
+ $$('[data-calendar-date]').forEach(button=>{button.addEventListener('click',()=>{const chosen=pickRange(state.draftStart,state.draftEnd,button.dataset.calendarDate);state.draftStart=chosen.start;state.draftEnd=chosen.end;renderCalendar();$('[data-calendar-date="'+button.dataset.calendarDate+'"]').focus();});button.addEventListener('keydown',e=>{const step={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];if(!step)return;e.preventDefault();const target=dayString(dayNumber(button.dataset.calendarDate)+step);state.calendarMonth=target.slice(0,7)+'-01';renderCalendar();$('[data-calendar-date="'+target+'"]').focus();});});
+}
+function periodNote(){if(state.datePreset==='12h')return 'Last 12 hours · PKT';return state.dateFrom||state.dateTo?'Selected dates · PKT':'Next '+state.hours+' hours';}
 function summarySentence(w,a){const rows=selectedRows(w.hourly),peak=extreme(rows,'heat_index_c'),air=extreme(selectedRows(a.hourly),'us_aqi');if(!rows.length)return 'No weather outlook is available in this date range. Explore the air archive for historical dates.';return `Feels-like heat reaches ${fmt(temperature(peak?.heat_index_c))}°${state.unit}${peak?' on '+day(peak.time_utc)+' at '+clock(peak.time_utc):''}; ${air?'air quality reaches US AQI '+fmt(air.us_aqi,0)+' in the same selected period.':'air-quality outlook is unavailable for these dates.'}`;}
 
 const svgEl=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));parent?.appendChild(e);return e;};
@@ -64,7 +87,7 @@ async function loadData(manual=false){
   let data;try{const r=await fetch('/api/dashboard?city='+encodeURIComponent(state.city),{signal:AbortSignal.timeout(15000),cache:'no-store'});if(!r.ok||!r.headers.get('content-type')?.includes('application/json'))throw Error();data=await r.json();state.api=true;}catch{const r=await fetch(state.city==='karachi'?'snapshot.json':'city-snapshots.json',{cache:'no-store'});if(!r.ok)throw Error('The API and saved snapshot are unavailable.');const saved=await r.json();data=state.city==='karachi'?saved:saved[state.city];if(!data||data.city?.id!==state.city)throw Error('No saved snapshot for this city.');state.api=false;}
   if(data.city?.id!==state.city)throw Error('The response belongs to a different city.');
   if(!data.weather||!data.air_quality||!data.network)throw Error('Dashboard data is incomplete. Rebuild the deployment package.');
-  for(const feed of [data.weather,data.air_quality]){const age=(Date.now()-new Date(feed.valid_at_utc).getTime())/1000;if(feed.status==='live'&&(!Number.isFinite(age)||age>10800||age< -3600))feed.status='stale';} const forecastAge=(Date.now()-new Date(data.freshness.collected_at_utc).getTime())/1000;data.fresh=Boolean(data.verified&&forecastAge>=0&&forecastAge<=10800);state.data=data;state.lastLoad=Date.now();updateHeader();render();
+  for(const feed of [data.weather,data.air_quality]){const age=(Date.now()-new Date(feed.valid_at_utc).getTime())/1000;if(feed.status==='live'&&(!Number.isFinite(age)||age>10800||age< -3600))feed.status='stale';} const forecastAge=(Date.now()-new Date(data.freshness.collected_at_utc).getTime())/1000;data.fresh=Boolean(data.verified&&forecastAge>=0&&forecastAge<=10800);state.data=data;state.lastLoad=Date.now();if(state.datePreset==='12h'){state.filterAt=Date.now();const period=presetDates('12h');state.dateFrom=period.from;state.dateTo=period.to;}updateHeader();render();
   if(manual)toast(state.api?'Dashboard checked. Source timestamps show when the cache last refreshed.':'API unavailable. Showing the saved snapshot.');
  }catch(e){if(!state.data)$('#content-view').innerHTML=`<div class="loading-state"><h2>Unable to load the dashboard</h2><p>${escapeHTML(e.message)}</p></div>`;toast(e.message);}
  finally{state.loading=false;$('#refresh-button').disabled=false;$('#city-select').disabled=false;}
@@ -80,7 +103,7 @@ function updateHeader(){
  $('.last-pull').title=`Weather: ${date(w.fetched_at_utc)} PKT\nAir: ${date(a.fetched_at_utc)} PKT\nModel estimates, not on-site sensors.`;
  let title='City now',kpis=[['☀','TEMPERATURE',temperature(c.temperature_c),'°'+state.unit,'Latest source value'],['◈','FEELS LIKE',temperature(c.heat_index_c),'°'+state.unit,'Calculated heat index'],['≋','US AQI',a.current.us_aqi,'',a.current.aqi_category],['◌','HUMIDITY',c.humidity_pct,'%','Latest source value'],['↝','WIND',c.wind_speed_ms,'m/s','At 10 metres']];
  if(state.view==='forecast'){title='Planning outlook';kpis=[['🔥','PEAK FEELS LIKE',temperature(peak?.heat_index_c),'°'+state.unit,peak?clock(peak.time_utc)+' PKT':'No selected data'],['☀','HIGH',temperature(extreme(wr,'temperature_c')?.temperature_c),'°'+state.unit,periodNote()],['☾','LOW',temperature(extreme(wr,'temperature_c',false)?.temperature_c),'°'+state.unit,periodNote()],['💧','PEAK HUMIDITY',extreme(wr,'humidity_pct')?.humidity_pct,'%','Selected outlook'],['◷','TIME POINTS',wr.length,'','Available hourly values']];}
- if(state.view==='air'){const archive=!ar.length&&(state.dateFrom||state.dateTo),pollutantRows=archive?filterDates(d.air_history.daily||[],state.dateFrom,state.dateTo):ar;title=archive?'Air archive':'Air outlook';kpis=[['≋','PEAK US AQI',extreme(ar,'us_aqi')?.us_aqi,'',periodNote()],...['pm2_5','pm10','nitrogen_dioxide','ozone'].map((k,i)=>['◌',['PEAK PM2.5','PEAK PM10','PEAK NO₂','PEAK O₃'][i],extreme(pollutantRows,k)?.[k],'µg/m³',archive?'Peak daily mean':'Selected forecast'])];}
+ if(state.view==='air'){const archive=state.datePreset!=='12h'&&!ar.length&&(state.dateFrom||state.dateTo),pollutantRows=archive?filterDates(d.air_history.daily||[],state.dateFrom,state.dateTo):ar;title=archive?'Air archive':'Air outlook';kpis=[['≋','PEAK US AQI',extreme(ar,'us_aqi')?.us_aqi,'',periodNote()],...['pm2_5','pm10','nitrogen_dioxide','ozone'].map((k,i)=>['◌',['PEAK PM2.5','PEAK PM10','PEAK NO₂','PEAK O₃'][i],extreme(pollutantRows,k)?.[k],'µg/m³',archive?'Peak daily mean':'Selected forecast'])];}
  if(state.view==='network'){title='Connected evidence';kpis=[['◎','NODES',d.network.nodes.length,'','From backend payload'],['⌁','LINKS',d.network.links.length,'','Select a node to trace'],['☀','WEATHER',d.network.nodes.filter(n=>n.group==='weather').length,'','Connected signals'],['≋','AIR SIGNALS',d.network.nodes.filter(n=>n.group==='air').length,'','Available signals'],['▧','GUIDANCE',d.sources.length,'','Official sources']];}
  if(state.view==='evidence'){title='Source integrity';kpis=[['▧','SOURCES',d.sources.length,'','Official safety knowledge'],['↔','MODEL ERROR',d.metrics.test_model_mae_c,'°C','Mean absolute error'],['◈','TEST R²',d.metrics.test_model_r2,'','Held-out evaluation'],['◷','TEST HOURS',d.metrics.test_rows,'','Historical evaluation'],['↻','API CACHE',15,'min','Per Python instance']];}
  $('#panel-name').textContent=title;
@@ -94,7 +117,7 @@ function render(){
  if(state.view==='network'){buildNetwork();return;}
  $('#content-view').innerHTML=({overview:overviewView,forecast:forecastView,air:airView,evidence:evidenceView}[state.view]||overviewView)();
  $$('[data-view-link]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.viewLink)));
- $$('[data-hours]').forEach(b=>b.addEventListener('click',()=>{state.hours=Number(b.dataset.hours);state.datePreset='outlook';state.dateFrom='';state.dateTo='';$('#date-from').value='';$('#date-to').value='';render();}));
+ $$('[data-hours]').forEach(b=>b.addEventListener('click',()=>{state.hours=Number(b.dataset.hours);state.datePreset='outlook';state.dateFrom='';state.dateTo='';closeCalendar(false);render();}));
  $$('[data-unit]').forEach(b=>b.addEventListener('click',()=>{state.unit=b.dataset.unit;updateHeader();render();}));
  drawViewCharts();
 }
@@ -129,7 +152,7 @@ prepared.forEach(s=>{const color=getComputedStyle(document.documentElement).getP
  markers.forEach(([point,label],i)=>{const [t,v]=point,px=x(t),py=y(v),tx=Math.max(L+4,Math.min(W-190,px-55)),ty=30+i*17;svgEl('line',{x1:px,x2:px,y1:ty+5,y2:py,stroke:'var(--muted)','stroke-dasharray':'2 3',opacity:'.6'},svg);svgEl('circle',{cx:px,cy:py,r:4,fill:'var(--text)',stroke:'var(--panel)', 'stroke-width':2},svg);svgEl('text',{x:tx,y:ty,class:'event-label'},svg).textContent=`${label} ${fmt(v)} ${unit} · ${monthly?day(t):clock(t)}`;});
  const note=document.createElement('p');note.className='chart-summary';note.textContent=markers.map(([[t,v],label])=>`${label}: ${primary.label} ${fmt(v)} ${unit}, ${date(t)} PKT`).join(' · ');container.appendChild(note);
 }
-function drawViewCharts(){const d=state.data,allWeather=forecastRows(d.weather),cutoff=new Date(d.weather.forecast_start_utc||d.weather.valid_at_utc).getTime()+state.hours*3600000,w=state.dateFrom||state.dateTo?filterDates(allWeather,state.dateFrom,state.dateTo):allWeather.filter(r=>new Date(r.time_utc).getTime()<=cutoff),a=selectedRows(d.air_quality.hourly);drawChart('weather-chart',w,[{key:'temperature_c',label:'Temperature',color:'--weather',transform:temperature},{key:'heat_index_c',label:'Heat index',color:'--forecast',transform:temperature}],{unit:'°'+state.unit,forecastStart:d.weather.forecast_start_utc||d.weather.valid_at_utc});drawChart('aqi-chart',a,[{key:'us_aqi',label:'US AQI',color:'--air'}],{area:true,unit:'US AQI',zero:true});drawChart('particles-chart',a,[{key:'pm2_5',label:'PM2.5',color:'--air'},{key:'pm10',label:'PM10',color:'--safety'}],{unit:'µg/m³',zero:true});const custom=state.dateFrom||state.dateTo;drawChart('history-chart',custom?filterDates(d.air_history.daily||[],state.dateFrom,state.dateTo):d.air_history.monthly,[{key:'pm2_5',label:'Historical PM2.5 '+(custom?'daily':'monthly')+' mean',color:'--air'}],{area:true,unit:'µg/m³',monthly:true,zero:true});}
+function drawViewCharts(){const d=state.data,allWeather=forecastRows(d.weather),cutoff=new Date(d.weather.forecast_start_utc||d.weather.valid_at_utc).getTime()+state.hours*3600000,w=state.dateFrom||state.dateTo?periodRows(allWeather):allWeather.filter(r=>new Date(r.time_utc).getTime()<=cutoff),a=selectedRows(d.air_quality.hourly);drawChart('weather-chart',w,[{key:'temperature_c',label:'Temperature',color:'--weather',transform:temperature},{key:'heat_index_c',label:'Heat index',color:'--forecast',transform:temperature}],{unit:'°'+state.unit,forecastStart:d.weather.forecast_start_utc||d.weather.valid_at_utc});drawChart('aqi-chart',a,[{key:'us_aqi',label:'US AQI',color:'--air'}],{area:true,unit:'US AQI',zero:true});drawChart('particles-chart',a,[{key:'pm2_5',label:'PM2.5',color:'--air'},{key:'pm10',label:'PM10',color:'--safety'}],{unit:'µg/m³',zero:true});const custom=state.dateFrom||state.dateTo;drawChart('history-chart',custom?filterDates(d.air_history.daily||[],state.dateFrom,state.dateTo):d.air_history.monthly,[{key:'pm2_5',label:'Historical PM2.5 '+(custom?'daily':'monthly')+' mean',color:'--air'}],{area:true,unit:'µg/m³',monthly:true,zero:true});}
 function nodeValue(n){if(n.id==='mae')return fmt(n.value,2)+' °C';return typeof n.value==='string'?n.value:finite(n.value)?fmt(n.unit==='°C'?temperature(n.value):n.value,n.id==='aqi'?0:n.id==='r2'?3:1)+(n.unit?' '+(n.unit==='°C'?'°'+state.unit:n.unit):''):'';}
 function graphPositions(network,orbit=false){const groups=network.nodes.filter(n=>n.parent===networkRoot(network));return network.nodes.map(n=>{if(n.id===networkRoot(network))return {...n,x:705,y:410,r:30};const g=groups.findIndex(g=>g.id===(n.parent===networkRoot(network)?n.id:n.parent));const angle=-Math.PI*.78+Math.max(0,g)*Math.PI*2/Math.max(1,groups.length);if(n.parent===networkRoot(network))return {...n,x:705+Math.cos(angle)*185,y:410+Math.sin(angle)*185,r:16};const siblings=network.nodes.filter(s=>s.parent===n.parent),i=siblings.findIndex(s=>s.id===n.id);const spread=(i-(siblings.length-1)/2)*.24;const distance=orbit?285:280+(i%2)*22;return {...n,x:705+Math.cos(angle+spread)*distance,y:410+Math.sin(angle+spread)*distance,r:8};});}
 function buildNetwork(){
@@ -164,22 +187,25 @@ async function ask(question){
   $('#answer-content').innerHTML=`<div class="answer-question">${escapeHTML(question)}</div><p class="answer-text">I couldn’t connect to the assistant just now. Please try again shortly. You can still explore the dashboard while the connection recovers.</p>`;
  }finally{state.asking=false;$('.send-button').disabled=false;}
 }
-function chooseTheme(theme){if(!['forest','maroon','orange','brown','purple'].includes(theme))theme='forest';document.documentElement.dataset.theme=theme;try{localStorage.setItem('heatsafe-theme',theme);}catch{}$$('[data-theme-choice]').forEach(b=>b.classList.toggle('selected',b.dataset.themeChoice===theme));if(state.data)render();}
+function chooseTheme(theme){if(!['forest','maroon','orange','brown','purple'].includes(theme))theme='maroon';document.documentElement.dataset.theme=theme;try{localStorage.setItem('heatsafe-theme',theme);}catch{}$$('[data-theme-choice]').forEach(b=>b.classList.toggle('selected',b.dataset.themeChoice===theme));if(state.data)render();}
 function init(){
  $('#city-select').addEventListener('change',()=>{state.city=$('#city-select').value;state.chatHistory=[];state.data=null;state.selected=null;state.filter=null;$('#answer-panel').hidden=true;$('#detail-panel').hidden=true;$('#network-view').hidden=true;$('#content-view').hidden=false;$('#content-view').innerHTML='<div class="loading-state"><h2>Loading city data…</h2></div>';$('#pulse-kpis').textContent='Loading selected city…';$('#city-title').textContent=$('#city-select').selectedOptions[0].textContent+' Pulse';$('#city-location').textContent='';loadData();});
 
- $$('[data-date-preset]').forEach(b=>b.addEventListener('click',()=>{const preset=b.dataset.datePreset;if(preset==='custom'){const range=presetDates('7');setDates(state.dateFrom||range.from,state.dateTo||range.to,'custom');}else{const range=presetDates(preset);setDates(range.from,range.to,preset);}}));
- $('#date-form').addEventListener('submit',e=>{e.preventDefault();const from=$('#date-from').value,to=$('#date-to').value;if(!from||!to||from>to){$('#date-status').textContent='Choose a start and end date in order.';return;}setDates(from,to);});
+
+ $$('[data-date-preset]').forEach(b=>b.addEventListener('click',()=>{const preset=b.dataset.datePreset;if(preset==='custom')openCalendar();else{const range=presetDates(preset);setDates(range.from,range.to,preset);}}));
  $('#date-reset').addEventListener('click',()=>setDates('','','outlook'));
- for(const id of ['range-start','range-end']){$('#'+id).addEventListener('input',()=>{const lo=$('#range-start'),hi=$('#range-end');if(Number(lo.value)>Number(hi.value)){if(id==='range-start')hi.value=lo.value;else lo.value=hi.value;}$('#date-from').value=dayString(lo.value);$('#date-to').value=dayString(hi.value);$('#range-caption').textContent=dayString(lo.value)+' → '+dayString(hi.value)+' · PKT';});$('#'+id).addEventListener('change',()=>setDates($('#date-from').value,$('#date-to').value));}
- let theme='forest';try{theme=localStorage.getItem('heatsafe-theme')||theme;}catch{}chooseTheme(theme);
+ $('#calendar-prev').addEventListener('click',()=>moveCalendar(-1));$('#calendar-next').addEventListener('click',()=>moveCalendar(1));
+ $('#calendar-cancel').addEventListener('click',()=>closeCalendar());
+ $('#calendar-apply').addEventListener('click',()=>{if(state.draftStart&&state.draftEnd){setDates(state.draftStart,state.draftEnd);$('#custom-date-button').focus();}});
+ document.addEventListener('click',e=>{if(!$('#range-calendar').hidden&&!e.composedPath().includes($('#range-calendar'))&&!$('#custom-date-button').contains(e.target))closeCalendar(false);});
+ let theme='maroon';try{theme=localStorage.getItem('heatsafe-theme')||theme;}catch{}chooseTheme(theme);
  $$('.view-tab').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));$('#refresh-button').addEventListener('click',()=>loadData(true));$('#ask-form').addEventListener('submit',e=>{e.preventDefault();ask($('#question').value);});$('#close-answer').addEventListener('click',()=>$('#answer-panel').hidden=true);$('#close-detail').addEventListener('click',()=>{state.selected=null;$('#detail-panel').hidden=true;filterGraph();$$('.graph-node').forEach(e=>e.classList.remove('selected'));});
  $('#theme-button').addEventListener('click',()=>{const menu=$('#theme-menu');menu.hidden=!menu.hidden;$('#theme-button').setAttribute('aria-expanded',String(!menu.hidden));});$$('[data-theme-choice]').forEach(b=>b.addEventListener('click',()=>{chooseTheme(b.dataset.themeChoice);$('#theme-menu').hidden=true;$('#theme-button').setAttribute('aria-expanded','false');}));
- $('#help-button').addEventListener('click',()=>$('#info-dialog').showModal());$('.dialog-close').addEventListener('click',()=>$('#info-dialog').close());
+ $('#help-button').addEventListener('click',()=>$('#info-dialog').showModal());$('#guide-button').addEventListener('click',()=>$('#info-dialog').showModal());$('.dialog-close').addEventListener('click',()=>$('#info-dialog').close());
  $('#zoom-in').addEventListener('click',()=>{state.zoom+=.15;applyTransform();});$('#zoom-out').addEventListener('click',()=>{state.zoom-=.15;applyTransform();});$('#zoom-reset').addEventListener('click',resetMap);$('#fit-map').addEventListener('click',resetMap);$('#network-layout').addEventListener('click',()=>{state.orbit=false;buildNetwork();});$('#orbit-layout').addEventListener('click',()=>{state.orbit=true;buildNetwork();});$('#motion-toggle').addEventListener('click',()=>{state.paused=!state.paused;document.body.classList.toggle('motion-paused',state.paused);$('#motion-toggle').setAttribute('aria-pressed',String(state.paused));$('#motion-toggle').textContent=state.paused?'▷':'Ⅱ';});document.body.classList.toggle('motion-paused',state.paused);
  const network=$('#network');let drag=null;network.addEventListener('wheel',e=>{e.preventDefault();state.zoom+=e.deltaY>0?-.07:.07;applyTransform();},{passive:false});network.addEventListener('pointerdown',e=>{if(e.target.closest('.graph-node'))return;drag={x:e.clientX,y:e.clientY,pan:{...state.pan}};network.setPointerCapture(e.pointerId);network.classList.add('dragging');});network.addEventListener('pointermove',e=>{if(!drag)return;const ratio=1440/network.getBoundingClientRect().width;state.pan={x:drag.pan.x+(e.clientX-drag.x)*ratio,y:drag.pan.y+(e.clientY-drag.y)*ratio};applyTransform();});['pointerup','pointercancel'].forEach(name=>network.addEventListener(name,()=>{drag=null;network.classList.remove('dragging');}));
- document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#answer-panel').hidden=true;$('#theme-menu').hidden=true;$('#theme-button').setAttribute('aria-expanded','false');$('#detail-panel').hidden=true;state.selected=null;filterGraph();$$('.graph-node').forEach(e=>e.classList.remove('selected'));}});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('#range-calendar').hidden)closeCalendar();$('#answer-panel').hidden=true;$('#theme-menu').hidden=true;$('#theme-button').setAttribute('aria-expanded','false');$('#detail-panel').hidden=true;state.selected=null;filterGraph();$$('.graph-node').forEach(e=>e.classList.remove('selected'));}});
  setInterval(()=>{if(!document.hidden)loadData();},300000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-(state.lastLoad||0)>300000)loadData();});loadData();
 }
 if(typeof document!=='undefined')init();
-else if(typeof module!=='undefined')module.exports={finite,fmt,nodeValue,weatherInfo,rowsForWindow,joinAir,segments,graphPositions,escapeHTML,calendarDay,filterDates,extreme,connectedLinks,forecastRows,presetDates,dayNumber,dayString};
+else if(typeof module!=='undefined')module.exports={finite,fmt,nodeValue,weatherInfo,rowsForWindow,joinAir,segments,graphPositions,escapeHTML,calendarDay,filterDates,extreme,connectedLinks,forecastRows,presetDates,dayNumber,dayString,rollingRows,calendarCells,pickRange};

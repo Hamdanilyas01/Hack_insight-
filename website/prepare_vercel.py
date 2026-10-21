@@ -43,6 +43,7 @@ def main():
         'website/environment_data.py': 'backend/environment_data.py',
         'website/city_data.py': 'backend/city_data.py',
         'website/assistant.py': 'backend/assistant.py',
+        'website/assistant_tools.py': 'backend/assistant_tools.py',
         'dashboard_data/multi_city_forecast.json': 'dashboard_data/multi_city_forecast.json',
         'data/city_era5_manifest.csv': 'data/city_era5_manifest.csv',
         'rag/insight_agent.py': 'rag/insight_agent.py',

@@ -72,8 +72,8 @@ Questions naming other supported cities can retrieve their evidence for comparis
 Answers include validated source references. Missing evidence, provider outages,
 quota limits and missing configuration produce friendly responses.
 
-Date controls now provide Last 7 days, Last 30 days, Last 6 months and Custom range
-cards. Custom range has two day sliders plus precise date inputs. Presets use
+Date controls now provide Last 12 hours, Last 7 days, Last 30 days and Custom dates
+controls. Custom dates opens one calendar: click a start date, click an end date, then Apply range. Last 12 hours is a rolling timestamp window; day presets use
 actual Pakistan calendar dates; they filter available records and do not backfill
 missing history. Reset to outlook restores the existing 24/48-hour forecast.
 
@@ -92,8 +92,23 @@ Open http://127.0.0.1:8000 and http://127.0.0.1:8000/api/health.
 ## Exploring the updated dashboard
 
 - Overview is a full-width city summary combining weather and air outlooks. The top panel is explicitly labeled City now; its values and the central weather display remain the latest source conditions.
-- Choose a preset card or Custom range for sliders and precise date inputs. Reset to outlook returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
+- Choose a preset card or Custom dates for a single start/end calendar. Reset to outlook returns to the next 24/48-hour outlook. The quick hour buttons also clear custom dates. Dates with no available data show an empty state. Network and Sources use current metadata and hide the slicer.
 - Forecast has the only temperature/heat-index line chart, with a vertical model-valid boundary, shaded future region, dashed prediction lines, event pins and a visual hourly planning strip. Recent values are model estimates, not observed sensor measurements. The separate stored ML point is never presented as a continuously rerun prediction.
 - Air quality has AQI, particle concentrations and a historical archive. Custom archive dates use daily means grouped by Karachi day; the default longer view uses the latest 12 monthly means. Animated dots are illustrative, not measurements. PM10 includes PM2.5; the values must not be added.
 - Each tab changes the KPI panel. Selecting a network node highlights its direct incoming/outgoing links. Close the detail panel to clear the highlight. Animations respect reduced-motion preferences.
 - The date selector filters available records; it does not trigger historical API backfills or change the read-only database/update schedule. Live responses include up to 12 recent model hours plus the future outlook.
+
+## Small-context assistant tools
+
+The Gemini request starts with the question, selected city/dates and a few short recent messages. It does not include the warehouse or bulk hourly/history arrays. Gemini can call these server-side functions:
+
+- `lookup_environment`: up to four requested metrics, using current/forecast data or a parameterized read-only database lookup for explicit historical dates. A historical day returns count, mean, minimum, maximum and their times; an optional hour returns that hour. Date ranges are capped at 366 days.
+- `get_model_insights`: one saved ML result, freshness/target date and a small evaluation summary.
+- `search_safety_guidance`: two short relevant official passages.
+- `get_project_info`: sources, cities, update behavior and navigation.
+
+Calls are validated against allowed cities, metrics and dates. Gemini cannot submit SQL or file paths. Current deployed history is Karachi-specific; other cities report unavailable historical records rather than reusing Karachi. A missing year can be clarified before querying.
+
+Tool results are bounded to 3,000 characters. A query allows at most four tool calls and three model requests, with a 20,000-character per-request cap and an 800-token output cap per model request. Recent chat text is limited to four messages of at most 400 characters each. Provider-reported counts are returned in `/api/insight` under `usage`, summed across planning and answer requests; `tools_used` identifies the function calls. Token use varies with the question.
+
+Beige/maroon is the default for new browser preferences. The other themes remain selectable, and saved theme choices are respected. The question-mark button beside the theme button opens a simple guide to the KPIs, charts, navigation, date filter and assistant.
